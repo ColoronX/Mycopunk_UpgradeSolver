@@ -1,114 +1,180 @@
-<!DOCTYPE html> 
-<html lang="en">
-<head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-NTX1YS21Y0"></script>
+<!DOCTYPE html><html lang="en" data-theme="dark"><head>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-NTX1YS21Y0"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
   gtag('config', 'G-NTX1YS21Y0');
 </script>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Mycopunk Upgrade Placement Solver</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mycopunk Upgrade Solver & Generator</title>
 <style>
-  :root { --panel-w: 360px; --bg: #fafafa; --ink: #222; --stroke: #7a4a2e; }
+  :root { 
+    --bg-body: #fafafa;
+    --bg-panel: #ffffff;
+    --bg-input: #ffffff;
+    --bg-hover: #f3f3f3;
+    --bg-code: #1e1e1e;
+    
+    --fg-primary: #222222;
+    --fg-secondary: #555555;
+    --fg-badge: #444444;
+    
+    --border: #dddddd;
+    --border-input: #cccccc;
+    --border-hover: #aaaaaa;
+    
+    --stroke: #7a4a2e;
+    
+    --hex-empty: #ffffff;
+    --hex-fill: #333333;
+    
+    --overlay-bg: rgba(255,255,255,0.7);
+    --kbd-bg: #f1f5f9;
+    --badge-bg: #f7f7f8;
+    
+    --panel-w: 380px; 
+  }
+
+  [data-theme="dark"] {
+    --bg-body: #121212;
+    --bg-panel: #1e1e1e;
+    --bg-input: #2c2c2c;
+    --bg-hover: #383838;
+    --bg-code: #000000;
+    
+    --fg-primary: #e0e0e0;
+    --fg-secondary: #aaaaaa;
+    --fg-badge: #e0e0e0;
+    
+    --border: #333333;
+    --border-input: #444444;
+    --border-hover: #666666;
+    
+    --stroke: #a67c52;
+    
+    --hex-empty: #2a2a2a;
+    --hex-fill: #e9bb38;
+    
+    --overlay-bg: rgba(0,0,0,0.7);
+    --kbd-bg: #333333;
+    --badge-bg: #333333;
+  }
+
   * { box-sizing: border-box; }
   body {
     margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    color: var(--ink); background: var(--bg);
+    color: var(--fg-primary); background: var(--bg-body);
     height: 100vh; display: grid; grid-template-rows: auto 1fr;
+    transition: background 0.2s, color 0.2s;
   }
   header {
     padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    border-bottom: 1px solid #ddd; background: #fff;
+    border-bottom: 1px solid var(--border); background: var(--bg-panel);
   }
   button {
-    padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; background: white; cursor: pointer;
+    padding: 8px 12px; border: 1px solid var(--border-input); border-radius: 8px; 
+    background: var(--bg-input); color: var(--fg-primary); cursor: pointer;
   }
-  button:hover { border-color: #aaa; }
+  button:hover { border-color: var(--border-hover); background: var(--bg-hover); }
+  
   main { display: grid; grid-template-columns: 1fr var(--panel-w); min-height: 0; }
-  /* Make the canvas column independently scrollable */
+ 
   #boardWrap {
     position: relative;
     display: grid;
-    /* top-center so you see the top of the board first */
     place-items: start center;
     min-width: 0;
-    /* this is the key for grid children to allow scrolling */
     min-height: 0;
-    /* enable vertical (and horizontal if needed) scrolling */
     overflow: auto;
-    /* nice feel on touchpads/phones */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding: 12px; /* optional breathing room around the canvas */
+    padding: 12px; 
   }
-  #board { background: #fff; border: 1px solid #ddd; border-radius: 12px; max-width: 100%; height: auto; }
+  #board { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; max-width: 100%; height: auto; }
+  
   #overlayMessage {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
-    font-size: 20px; font-weight: 600; color: #c00; background: rgba(255,255,255,0.7);
+    font-size: 20px; font-weight: 600; color: #ff5555; background: var(--overlay-bg);
     pointer-events: auto;
   }
-  /* Aside is a 3-row grid so the 3rd row (the list) can scroll independently */
+  
   aside {
-    border-left: 1px solid #ddd; background: #fff; min-width: 0;
+    border-left: 1px solid var(--border); background: var(--bg-panel); min-width: 0;
     display: grid; grid-template-rows: auto auto 1fr;
-    min-height: 0; /* allow inner scroll area to shrink */
+    min-height: 0; 
   }
   .sideHeader {
-    padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 600;
+    padding: 10px 12px; border-bottom: 1px solid var(--border); font-weight: 600;
     display:flex; align-items:center; gap:8px;
   }
   #shapeList { overflow: auto; padding: 10px; display: grid; gap: 10px; min-height: 0; }
 
-  /* Card layout: 3 rows (top/mid/bottom) */
   .shapeItem {
     display: grid;
-    grid-template-rows: auto auto auto; /* top, middle, bottom */
+    grid-template-rows: auto auto auto; 
     grid-template-columns: 1fr;
     gap: 6px;
-    padding: 8px; border: 1px solid #eee; border-radius: 10px;
+    padding: 8px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg-body);
   }
   .shapeTop { display:flex; align-items:center; justify-content:flex-start; }
   .shapeMid { display:grid; grid-template-columns: 1fr auto; align-items:center; gap:10px; }
   .shapeBottom { display:flex; align-items:center; justify-content:flex-start; }
-  .shapeMeta { display:flex; align-items:center; gap:10px; } /* for canvas on the left */
+  .shapeMeta { display:flex; align-items:center; gap:10px; } 
   .midControls { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
 
-  .shapeItem canvas { background: #fff; border: 1px dashed #ddd; border-radius: 8px; }
+  .shapeItem canvas { background: var(--bg-panel); border: 1px dashed var(--border); border-radius: 8px; }
   .shapeItem button { padding: 6px 8px; }
-  .hint { opacity: 0.8; font-size: 12px; }
+  .hint { opacity: 0.8; font-size: 12px; color: var(--fg-secondary); }
   .grow { flex: 1 1 auto; }
+  
   .solControls { display:flex; align-items:center; gap:8px; }
-  .solControls input[type="number"] { width: 72px; padding:6px 8px; border:1px solid #ccc; border-radius:8px; }
-  .pill { padding: 6px 10px; border:1px solid #eee; border-radius: 999px; background:#f7f7f7; }
+  .solControls input[type="number"] { width: 72px; padding:6px 8px; border:1px solid var(--border-input); border-radius:8px; background: var(--bg-input); color: var(--fg-primary); }
+  .pill { padding: 6px 10px; border:1px solid var(--border); border-radius: 999px; background:var(--badge-bg); color: var(--fg-secondary); }
+  
   .sizeControls { display:flex; align-items:center; gap:6px; }
-  .sizeControls input[type="number"] { width: 64px; padding:6px 8px; border:1px solid #ccc; border-radius:8px; }
+  .sizeControls input[type="number"] { width: 64px; padding:6px 8px; border:1px solid var(--border-input); border-radius:8px; background: var(--bg-input); color: var(--fg-primary); }
   .xsep { opacity:.6; }
-  .check { display:flex; align-items:center; gap:6px; user-select:none; }
+  
+  .check { display:flex; align-items:center; gap:6px; user-select:none; color: var(--fg-primary); }
   .check input { transform: translateY(1px); }
-  .badge { padding:2px 8px; border:1px solid #e6e8eb; border-radius:999px; font-size:12px; background:#f7f7f8; color:#444; }
-  .sideHint { padding:10px 12px; border-bottom:1px solid #eee; color:#555; font-size:12px; background:#fafafa; }
-  .sideHint kbd { font: 500 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#f1f5f9; border:1px solid #e5e7eb; padding:2px 6px; border-radius:6px; }
-
-  /* Ghost button style for "Remove all" */
+  
+  .badge { padding:2px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; background:var(--badge-bg); color:var(--fg-badge); }
+  .sideHint { padding:10px 12px; border-bottom:1px solid var(--border); color:var(--fg-secondary); font-size:12px; background:var(--bg-body); }
+  .sideHint kbd { font: 500 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:var(--kbd-bg); border:1px solid var(--border); padding:2px 6px; border-radius:6px; color: var(--fg-primary); }
   .btn-ghost {
-    padding: 6px 10px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 12px;
+    padding: 6px 10px; border: 1px solid var(--border-input); border-radius: 8px; background: var(--bg-panel); cursor: pointer; font-size: 12px; color: var(--fg-primary);
   }
-  .btn-ghost:hover { border-color: #aaa; }
+  .btn-ghost:hover { border-color: var(--border-hover); background: var(--bg-hover); }
+  
+  .btn-code { background: rgba(46, 139, 87, 0.1); border-color: #2e8b57; color: #2e8b57; }
+  .btn-code:hover { background: rgba(46, 139, 87, 0.2); }
+  [data-theme="dark"] .btn-code { color: #4ade80; border-color: #4ade80; }
 
-  /* Bottom-row adjacency inputs */
   .adjRow { display:flex; align-items:center; gap:6px; width: 100%; }
   .adjRow .check { margin-right: auto; }
-  .adjRow input[type="number"] { width: 64px; padding:6px 8px; border:1px solid #ccc; border-radius:8px; }
+  .adjRow input[type="number"] { width: 64px; padding:6px 8px; border:1px solid var(--border-input); border-radius:8px; background: var(--bg-input); color: var(--fg-primary); }
   .indexBadge { font-weight:600; }
+
+  #codeModal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999;
+    display: none; align-items: center; justify-content: center;
+  }
+  #codeContent {
+    background: var(--bg-panel); padding: 20px; border-radius: 12px; width: 650px; max-width: 95%;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 10px;
+    border: 1px solid var(--border);
+    color: var(--fg-primary);
+  }
+  #codeArea {
+    width: 100%; height: 350px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px;
+    padding: 12px; border: 1px solid var(--border-input); border-radius: 6px; resize: vertical; 
+    background: var(--bg-code); color: #d4d4d4; white-space: pre;
+  }
+  .modalHeader { display: flex; justify-content: space-between; align-items: center; }
+  .modalActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;}
 </style>
 </head>
 <body>
@@ -117,7 +183,6 @@
     <button id="btnSolve">🔎 Find placement</button>
     <button id="btnClear">🧹 Clear</button>
 
-    <!-- NEW: rotation toggle (off by default) -->
     <label class="check" title="Include rotated variants of shapes during search">
       <span class="hint">Disable Rotation</span>
       <input type="checkbox" id="disableRotation">
@@ -125,18 +190,20 @@
 
     <div class="sizeControls">
       <span class="hint">Board</span>
-      <input id="inpW" type="number" min="1" max="50" value="7" />
+      <input id="inpW" type="number" min="1" max="50" value="7">
       <span class="xsep">×</span>
-      <input id="inpH" type="number" min="1" max="50" value="6" />
+      <input id="inpH" type="number" min="1" max="50" value="6">
     </div>
+
+    <button id="btnTheme" title="Toggle Dark Mode">🌙</button>
 
     <div class="grow"></div>
     <div class="solControls">
       <label class="hint">Max solutions</label>
-      <input id="maxSol" type="number" min="1" max="200" value="5" />
-      <button id="btnPrev" disabled>◀</button>
+      <input id="maxSol" type="number" min="1" max="200" value="5">
+      <button id="btnPrev" disabled="">◀</button>
       <span id="solInfo" class="pill hint">0 / 0</span>
-      <button id="btnNext" disabled>▶</button>
+      <button id="btnNext" disabled="">▶</button>
     </div>
   </header>
 
@@ -155,10 +222,25 @@
       <div id="shapeList"></div>
     </aside>
   </main>
+
+  <div id="codeModal">
+    <div id="codeContent">
+      <div class="modalHeader">
+        <h3 style="margin:0">C# Property Code</h3>
+        <label class="check">
+            <span class="hint">Generate Connections</span>
+            <input type="checkbox" id="chkAutoConnect" checked> 
+        </label>
+      </div>
+      <textarea id="codeArea" readonly></textarea>
+      <div class="modalActions">
+        <button id="btnCopyCode" class="btn-ghost">Copy Code</button>
+        <button id="btnCloseModal" class="btn-ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
 <script>
-/* ================================
- *  Palette (40 colors)
- * ================================ */
 const COLORS = [
   "#e6194b","#3cb44b","#0082c8","#f58231","#911eb4","#46f0f0",
   "#f032e6","#d2f53c","#fabebe","#008080","#e6beff","#aa6e28",
@@ -169,18 +251,12 @@ const COLORS = [
   "#1e90ff","#c71585","#00ced1","#f0e68c"
 ];
 
-/* ================================
- *  Small helpers
- * ================================ */
 const toKey = (x,y) => `${x},${y}`;
 const fromKey = k => k.split(',').map(Number);
 const cmpCoord = (a,b) => a[0] - b[0] || a[1] - b[1];
 const cloneCells = cells => cells.map(([x,y]) => [x,y]);
 function canonicalKey(cells) { const arr = cells.map(([x,y]) => `${x},${y}`); arr.sort(); return arr.join(';'); }
 
-/* ================================
- *  Odd-q <-> Axial <-> Cube
- * ================================ */
 function oddq_to_axial([col,row]) {
   const parity = (col % 2 === 0) ? 0 : 1;
   const q = col;
@@ -203,9 +279,104 @@ function _cube_rotate_steps(x,y,z,steps) {
   return [x,y,z];
 }
 
-/* ================================
- *  Shape utilities
- * ================================ */
+function getNeighborOffsets(isEvenCol) {
+    if (isEvenCol) {
+        return [
+            { dx: 0, dy: -1, name: 'North',      flag: 1 },
+            { dx: 1, dy: -1, name: 'NorthEast',  flag: 2 },
+            { dx: 1, dy: 0,  name: 'SouthEast',  flag: 4 },
+            { dx: 0, dy: 1,  name: 'South',      flag: 8 },
+            { dx: -1, dy: 0, name: 'SouthWest',  flag: 16 },
+            { dx: -1, dy: -1,name: 'NorthWest',  flag: 32 }
+        ];
+    } else {
+        return [
+            { dx: 0, dy: -1, name: 'North',      flag: 1 },
+            { dx: 1, dy: 0,  name: 'NorthEast',  flag: 2 },
+            { dx: 1, dy: 1,  name: 'SouthEast',  flag: 4 },
+            { dx: 0, dy: 1,  name: 'South',      flag: 8 },
+            { dx: -1, dy: 1, name: 'SouthWest',  flag: 16 },
+            { dx: -1, dy: 0, name: 'NorthWest',  flag: 32 }
+        ];
+    }
+}
+
+function normalizeForExport(cells) {
+    if (!cells.length) return [];
+    let minX = Infinity, minY = Infinity;
+    cells.forEach(([x,y]) => {
+        if(x < minX) minX = x;
+        if(y < minY) minY = y;
+    });
+
+    const norm = [];
+    let newMinY = Infinity;
+
+    cells.forEach(([x,y]) => {
+        let nx = x - minX;
+        let ny = y - minY;
+        
+        if ((x % 2 !== 0) && (nx % 2 === 0)) {
+            ny += 1; 
+        }
+        
+        norm.push([nx, ny]);
+        if (ny < newMinY) newMinY = ny;
+    });
+
+    if (newMinY < 0) {
+        norm.forEach(c => c[1] -= newMinY);
+    } else if (newMinY > 0) {
+        norm.forEach(c => c[1] -= newMinY);
+    }
+    return norm;
+}
+
+function generateCSharp(cells, autoConnect) {
+    const norm = normalizeForExport(cells);
+    const map = new Map();
+    norm.forEach(([x,y]) => map.set(`${x},${y}`, { x, y, degree: 0 }));
+
+    map.forEach(info => {
+        const isEven = (info.x % 2 === 0);
+        getNeighborOffsets(isEven).forEach(o => {
+            if (map.has(`${info.x + o.dx},${info.y + o.dy}`)) info.degree++;
+        });
+    });
+
+    const hasPriority = (a, b) => {
+        if (a.degree !== b.degree) return a.degree > b.degree;
+        if (a.y !== b.y) return a.y < b.y;
+        return a.x < b.x;
+    };
+
+    let w = 0, h = 0;
+    norm.forEach(([x,y]) => { w = Math.max(w, x); h = Math.max(h, y); });
+    w = Math.max(3, w + 1); h = Math.max(3, h + 1);
+    
+    norm.sort((a,b) => a[0] - b[0] || a[1] - b[1]);
+
+    let sb = `protected override HexMap Pattern\n{\n\tget\n\t{\n\t\tHexMap m = new HexMap(${w}, ${h});\n`;
+    norm.forEach(([x,y]) => {
+        sb += `\t\tm[${x}, ${y}].enabled = true;`;
+        if (autoConnect) {
+            const me = map.get(`${x},${y}`);
+            const isEven = (x % 2 === 0);
+            const flags = [];
+            getNeighborOffsets(isEven).forEach(o => {
+                const nKey = `${x + o.dx},${y + o.dy}`;
+                if (map.has(nKey) && hasPriority(me, map.get(nKey))) {
+                    flags.push(`HexMap.Direction.${o.name}`);
+                }
+            });
+            if (flags.length) sb += ` m[${x}, ${y}].connections = ${flags.join(" | ")};`;
+        }
+        sb += `\n`;
+    });
+    sb += `\t\treturn m;\n\t}\n}`;
+    return sb;
+}
+  
 function get_pivot(cells) {
   return cells.reduce((best, cur) => {
     if (!best) return cur;
@@ -271,10 +442,6 @@ function rotate_shape(cells, times, max_width, max_height) {
   for (const [x,y] of rotated) if (!(0 <= x && x < max_width && 0 <= y && y < max_height)) return null;
   return rotated;
 }
-
-/* ================================
- *  Axial offsets (placement math)
- * ================================ */
 function offsetsFromPivotAxial(cells) {
   const pivot = get_pivot(cells);
   const [pq, pr] = oddq_to_axial(pivot);
@@ -287,13 +454,8 @@ function offsetsFromPivotAxial(cells) {
   return offs;
 }
 function offsetsKey(offs) { return offs.map(([dq,dr]) => dq + "," + dr).join(";"); }
-
-/* ================================
- *  Drawing (Canvas) — hex
- * ================================ */
 function drawHex(ctx, cx, cy, r, fill, stroke, alpha=1) {
-  const strokeColor =
-    getComputedStyle(document.documentElement).getPropertyValue('--stroke').trim() || 'brown';
+  const strokeColor = getComputedStyle(document.documentElement).getPropertyValue('--stroke').trim();
   ctx.save();
   ctx.beginPath();
   for (let i=0;i<6;i++) {
@@ -310,9 +472,6 @@ function drawHex(ctx, cx, cy, r, fill, stroke, alpha=1) {
   ctx.restore();
 }
 
-/* ================================
- *  HexBoard (0,0 at bottom-left)
- * ================================ */
 class HexBoard {
   constructor(width, height, canvas) {
     this.radius = 40;
@@ -347,6 +506,20 @@ class HexBoard {
     this.canvas.width = pxW;
     this.canvas.height = pxH;
   }
+  
+  set_cell(mouseX, mouseY, mode) {
+    let chosen = null, bestD2 = Infinity;
+    for (const [k,[cx,cy]] of this.hexCenters.entries()) {
+      const dx = mouseX - cx, dy = mouseY - cy;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < this.radius*this.radius && d2 < bestD2) { bestD2 = d2; chosen = k; }
+    }
+    if (!chosen) return null;
+    if (mode === null) return this.filled.has(chosen);
+    if (mode && !this.filled.has(chosen)) { this.filled.set(chosen, "black"); return true; }
+    if (!mode && this.filled.has(chosen)) { this.filled.delete(chosen); return true; }
+    return false;
+  }
 
   cell_center(x,y) {
     const yDown = (this.height - 1 - y);
@@ -357,6 +530,9 @@ class HexBoard {
 
   draw() {
     const ctx = this.ctx;
+    const emptyColor = getComputedStyle(document.body).getPropertyValue('--hex-empty').trim();
+    const fillColor = getComputedStyle(document.body).getPropertyValue('--hex-fill').trim();
+    
     ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
     this.hexCenters.clear();
     ctx.textAlign = 'center';
@@ -365,8 +541,12 @@ class HexBoard {
 
     for (const [x,y] of this.cells) {
       const [cx,cy] = this.cell_center(x,y);
-      const color = this.filled.get(toKey(x,y)) || "white";
-      drawHex(ctx, cx, cy, this.radius, color, null, 0.8);
+      const val = this.filled.get(toKey(x,y));
+      let color = val;
+      if (!val) color = emptyColor;
+      else if (val === "black") color = fillColor;
+
+      drawHex(ctx, cx, cy, this.radius, color, null, 1);
       this.hexCenters.set(toKey(x,y), [cx,cy]);
     }
   }
@@ -400,16 +580,13 @@ class HexBoard {
   clear_all() { this.filled.clear(); }
 }
 
-/* ================================
- *  Shape
- * ================================ */
 class Shape {
   constructor(cells, color) {
     this.cells = cloneCells(cells);
     this.color = color;
     this.pivot = get_pivot(this.cells) || [0,0];
-    this.prism = false;          // whether this shape must be adjacent to other prisms
-    this.adjacentTo = null;      // index (0-based) of the shape it must touch; null = disabled
+    this.prism = false;
+    this.adjacentTo = null;
   }
 
   drawToCanvas(canvas) {
@@ -450,9 +627,6 @@ class Shape {
   rotate_about_pivot(times) { return rotate_cells_about_pivot_oddq(this.cells, times); }
 }
 
-/* ================================
- *  Worker factory + chunk util
- * ================================ */
 function createSolverWorkerURL() {
   const src = `
     self.onmessage = (e) => {
@@ -501,23 +675,28 @@ function chunk(arr, k) {
   return out;
 }
 
-/* ================================
- *  App
- * ================================ */
 class App {
   constructor() {
     this.canvas = document.getElementById('board');
     this.board = new HexBoard(7, 6, this.canvas);
 
-    // UI
     document.getElementById('btnAdd').addEventListener('click', () => this.add_shape());
     document.getElementById('btnSolve').addEventListener('click', () => this.find_placement());
     document.getElementById('btnClear').addEventListener('click', () => this.clear_board());
     document.getElementById('btnPrev').addEventListener('click', () => this.showPrevSolution());
     document.getElementById('btnNext').addEventListener('click', () => this.showNextSolution());
     document.getElementById('btnRemoveAll').addEventListener('click', () => this.remove_all_shapes());
+    document.getElementById('btnTheme').addEventListener('click', () => this.toggleTheme());
+    document.getElementById('btnCopyCode').addEventListener('click', () => {
+        const ta = document.getElementById('codeArea');
+        ta.select();
+        navigator.clipboard.writeText(ta.value);
+    });
+    document.getElementById('btnCloseModal').addEventListener('click', () => {
+        document.getElementById('codeModal').style.display = 'none';
+    });
+    document.getElementById('chkAutoConnect').addEventListener('change', () => this.refreshCodeModal());
 
-    // size controls (auto-apply on input/change)
     this.inpW = document.getElementById('inpW');
     this.inpH = document.getElementById('inpH');
     const debounce = (fn, ms = 200) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); }; };
@@ -527,19 +706,35 @@ class App {
       this.inpH.addEventListener(evt, debouncedApply);
     });
 
-    this.canvas.addEventListener('click', (ev) => {
+    let isDragging = false;
+    let dragFillMode = true;
+
+    const getMousePos = (ev) => {
       const rect = this.canvas.getBoundingClientRect();
-      // Scale from CSS pixels (rect) to canvas pixels (width/height)
       const scaleX = this.canvas.width  / rect.width;
       const scaleY = this.canvas.height / rect.height;
+      return [(ev.clientX - rect.left) * scaleX, (ev.clientY - rect.top) * scaleY];
+    };
 
-      const x = (ev.clientX - rect.left) * scaleX;
-      const y = (ev.clientY - rect.top)  * scaleY;
+    this.canvas.addEventListener('mousedown', (ev) => {
+      const [x, y] = getMousePos(ev);
+      const currentState = this.board.set_cell(x, y, null);
+      if (currentState === null) return;
 
-      if (this.board.toggle_cell(x, y)) this.redraw();
+      isDragging = true;
+      dragFillMode = !currentState;
+      
+      if (this.board.set_cell(x, y, dragFillMode)) this.redraw();
     });
 
-    // Global click *capture*: if overlay is visible, hide it and swallow the click.
+    this.canvas.addEventListener('mousemove', (ev) => {
+      if (!isDragging) return;
+      const [x, y] = getMousePos(ev);
+      if (this.board.set_cell(x, y, dragFillMode)) this.redraw();
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
     document.addEventListener('click', (ev) => {
       const overlay = document.getElementById('overlayMessage');
       if (overlay?.dataset.active === '1') {
@@ -547,11 +742,9 @@ class App {
         ev.stopPropagation();
         ev.preventDefault();
       }
-    }, true); // capture phase so we run before any other handlers
+    }, true);
 
     window.addEventListener('keydown', (ev) => this.on_key(ev), { passive: false });
-
-    // Add shape with plain Enter (unless focused in size inputs)
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
         const t = e.target;
@@ -559,21 +752,40 @@ class App {
       }
     });
 
-    // State
     this.shapes = [];
     this.color_index = 0;
+    this.activeCodeShape = null;
 
     this.current_shape_coords = [];
     this.current_shape_color = "black";
     this.current_base = [0,0];
 
-    // Solutions browsing state
     this.solutionMasks = [];
     this.solutionIndex = 0;
     this.decodeHelpers = null;
     this.updateSolutionControls();
 
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      this.setTheme('light');
+    } else {
+      this.setTheme('dark');
+    }
+
     this.redraw();
+  }
+
+  toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    this.setTheme(isDark ? 'light' : 'dark');
+  }
+
+  setTheme(themeName) {
+    document.documentElement.setAttribute('data-theme', themeName);
+    localStorage.setItem('theme', themeName);
+    document.getElementById('btnTheme').textContent = themeName === 'dark' ? '☀️' : '🌙';
+    this.redraw();
+    this.update_shape_list();
   }
 
   applySize() {
@@ -591,43 +803,6 @@ class App {
   }
 
   on_key(event) {
-    // For debugging. Disabled.
-    // const key = event.key.toLowerCase();
-    // if (['arrowleft','arrowright','arrowup','arrowdown','r'].includes(key)) event.preventDefault();
-    // if (this.board.filled.size === 0) return;
-
-    // if (!this.current_shape_coords.length) {
-    //   this.current_shape_coords = Array.from(this.board.filled.keys(), fromKey);
-    //   this.current_shape_color = this.board.filled.values().next().value || "black";
-    //   this.current_base = get_pivot(this.current_shape_coords);
-    // }
-
-    // let dx = 0, dy = 0;
-    // if (key === 'arrowleft') dx = -1;
-    // else if (key === 'arrowright') dx = 1;
-    // else if (key === 'arrowup') dy = 1;
-    // else if (key === 'arrowdown') dy = -1;
-    // else if (key === 'r') {
-    //   const rotated = rotate_shape(this.current_shape_coords, 1, this.board.width, this.board.height);
-    //   if (rotated) {
-    //     this.board.filled.clear();
-    //     for (const c of rotated) this.board.filled.set(toKey(c[0], c[1]), this.current_shape_color);
-    //     this.current_shape_coords = rotated;
-    //   }
-    //   this.redraw();
-    //   return;
-    // }
-
-    // if (dx !== 0 || dy !== 0) {
-    //   const moved = move_shape(this.current_shape_coords, dx, dy, this.board.width, this.board.height);
-    //   if (moved) {
-    //     for (const c of this.current_shape_coords) this.board.filled.delete(toKey(c[0], c[1]));
-    //     this.current_shape_coords = moved;
-    //     this.current_base = [this.current_base[0] + dx, this.current_base[1] + dy];
-    //     for (const c of moved) this.board.filled.set(toKey(c[0], c[1]), this.current_shape_color);
-    //     this.redraw();
-    //   }
-    // }
   }
 
   add_shape() {
@@ -664,7 +839,21 @@ class App {
     this.redraw();
   }
 
-  /* ---------- UI: list with Top/Mid/Bottom rows ---------- */
+  openCodeModal(shape) {
+    this.activeCodeShape = shape;
+    this.refreshCodeModal();
+    document.getElementById('codeModal').style.display = 'flex';
+  }
+
+refreshCodeModal() {
+    if (!this.activeCodeShape) return;
+    const auto = document.getElementById('chkAutoConnect').checked;
+    const cellsForGen = this.activeCodeShape.cells.map(([x,y]) => [x, -y]);
+    
+    const code = generateCSharp(cellsForGen, auto);
+    document.getElementById('codeArea').value = code;
+  }
+  
   update_shape_list() {
     const list = document.getElementById('shapeList');
     const empty = document.getElementById('emptyState');
@@ -672,25 +861,20 @@ class App {
     const removeAllBtn = document.getElementById('btnRemoveAll');
     list.innerHTML = '';
 
-    // Count badge
     if (countEl) countEl.textContent = String(this.shapes.length);
 
-    // Show/hide "Remove all" button
     if (removeAllBtn) removeAllBtn.style.display = this.shapes.length > 0 ? 'inline-block' : 'none';
 
-    // Empty state guidance
     if (this.shapes.length === 0) {
       if (empty) empty.style.display = 'block';
       return;
     }
     if (empty) empty.style.display = 'none';
 
-    // Render list
     this.shapes.forEach((shape, i) => {
       const item = document.createElement('div');
       item.className = 'shapeItem';
 
-      // Top row: index badge
       const topRow = document.createElement('div');
       topRow.className = 'shapeTop';
       const idxBadge = document.createElement('span');
@@ -698,29 +882,34 @@ class App {
       idxBadge.textContent = `#${i}`;
       topRow.appendChild(idxBadge);
 
-      // Middle row: canvas (left) + controls (right)
       const midRow = document.createElement('div');
       midRow.className = 'shapeMid';
 
       const meta = document.createElement('div');
       meta.className = 'shapeMeta';
       const canvas = document.createElement('canvas');
-      canvas.width = 200; canvas.height = 110;
+      canvas.width = 180; canvas.height = 100;
       shape.drawToCanvas(canvas);
       meta.appendChild(canvas);
 
       const controls = document.createElement('div');
       controls.className = 'midControls';
 
+      const btnCode = document.createElement('button');
+      btnCode.textContent = 'Get C# Code';
+      btnCode.className = 'btn-ghost btn-code';
+      btnCode.addEventListener('click', () => this.openCodeModal(shape));
+      controls.appendChild(btnCode);
+
       const btn = document.createElement('button');
       btn.textContent = 'Remove';
+      btn.className = 'btn-ghost';
       btn.addEventListener('click', () => this.remove_shape(i));
       controls.appendChild(btn);
 
       midRow.appendChild(meta);
       midRow.appendChild(controls);
 
-      // Bottom row: Prism + "Adjacent to" index
       const bottomRow = document.createElement('div');
       bottomRow.className = 'shapeBottom';
 
@@ -747,7 +936,7 @@ class App {
       adjInp.type = 'number';
       adjInp.min = '0';
       adjInp.step = '1';
-      adjInp.placeholder = 'index';
+      adjInp.placeholder = 'idx';
       adjInp.value = (Number.isInteger(shape.adjacentTo) ? String(shape.adjacentTo) : '');
       adjInp.addEventListener('input', () => {
         const v = adjInp.value.trim();
@@ -763,7 +952,6 @@ class App {
       adjRow.appendChild(adjInp);
       bottomRow.appendChild(adjRow);
 
-      // Compose rows
       item.appendChild(topRow);
       item.appendChild(midRow);
       item.appendChild(bottomRow);
@@ -805,9 +993,6 @@ class App {
     this.updateSolutionControls();
   }
 
-  /* ================================
-   *  Helpers for solver
-   * ================================ */
   buildNeighborMasks(W, H) {
     const idx_of = (x,y) => y*W + x;
     const masks = new Array(W*H).fill(0n);
@@ -830,9 +1015,6 @@ class App {
     return masks;
   }
 
-  /* ================================
-   *  Multithreaded solver + Prism + Directed Adjacency constraints
-   * ================================ */
   find_placement() {
     this.board.hideMessage();
     this.board.filled.clear();
@@ -852,7 +1034,6 @@ class App {
 
     const idx_of = (x,y) => y*W + x;
 
-    // Decode helpers
     const powIndex = new Map();
     const indexToCoord = [];
     for (let i=0;i<BOARD_CELLS;i++) {
@@ -861,18 +1042,15 @@ class App {
       indexToCoord.push([i % W, Math.floor(i / W)]);
     }
 
-    // Candidate placements via axial offsets
     const all_shape_placements = [];
     const shape_sizes = [];
     const prism_flags = this.shapes.map(s => !!s.prism);
 
-    // Gather directed adjacency constraints by original index (0-based)
     const adjacentTo = this.shapes.map((s,i) => Number.isInteger(s.adjacentTo) ? s.adjacentTo : -1);
     const anyAdj = adjacentTo.some(t => t >= 0);
     const anyPrism = prism_flags.some(Boolean);
 
     for (const shape of this.shapes) {
-      // Decide orientations based on toggle
       const orientations = disableRotation ? [shape.cells] : shape.rotations();
 
       const seenOffsets = new Set();
@@ -908,16 +1086,13 @@ class App {
       all_shape_placements.push(placements);
     }
 
-    // MRV order
     const order = [...all_shape_placements.keys()].sort((a,b) => all_shape_placements[a].length - all_shape_placements[b].length);
     const placements_ordered = order.map(i => all_shape_placements[i]);
     const sizes_ordered = order.map(i => shape_sizes[i]);
     const prism_ordered = order.map(i => prism_flags[i]);
 
-    // Map original indices <-> depth in search order
     const originalIndexToDepth = new Map(order.map((orig, d) => [orig, d]));
 
-    // Sanitize and build directed constraints in depth space
     const targetDepthForDepth = new Array(order.length).fill(-1);
     const sourcesForDepth = Array.from({length: order.length}, () => []);
     for (let orig = 0; orig < adjacentTo.length; orig++) {
@@ -926,11 +1101,10 @@ class App {
       const dSrc = originalIndexToDepth.get(orig);
       const dTgt = originalIndexToDepth.get(targOrig);
       if (dSrc === undefined || dTgt === undefined) continue;
-      targetDepthForDepth[dSrc] = dTgt;      // src must touch tgt
-      sourcesForDepth[dTgt].push(dSrc);      // tgt must touch these sources
+      targetDepthForDepth[dSrc] = dTgt;
+      sourcesForDepth[dTgt].push(dSrc);
     }
 
-    // Neighbor masks for adjacency checks (both prism cluster & directed constraints)
     const neighborMasks = this.buildNeighborMasks(W, H);
     const neighborOf = (mask) => {
       let res = 0n;
@@ -944,7 +1118,6 @@ class App {
       return res;
     };
 
-    // Seeds for parallel enumeration
     const seeds = placements_ordered[0];
     if (!seeds.length) { this.redraw(); this.board.drawMessage('No placement available'); return; }
 
@@ -958,7 +1131,6 @@ class App {
       this.applySolutionByIndex(0);
     };
 
-    // If any Prism or any directed adjacency exists, do single-threaded DFS with constraints
     if (anyPrism || anyAdj) {
       const n = placements_ordered.length;
       const remain = new Array(n + 1).fill(0);
@@ -981,13 +1153,10 @@ class App {
 
         const plist = placements_ordered[depth];
         const isPrism = prism_ordered[depth];
-
-        // Directed adjacency: shapes whose constraint points TO this depth and are already placed
         const mustTouchMasksFromSources = sourcesForDepth[depth]
           .filter(s => s < depth && chosen[s] !== 0n)
           .map(s => chosen[s]);
 
-        // Prism cluster adjacency (if cluster already started)
         const needPrismAdjacency = isPrism && prismPlacedCount > 0;
         const prismBorder = needPrismAdjacency ? neighborOf(prismUnion) : 0n;
 
@@ -995,17 +1164,13 @@ class App {
           const mask = plist[i];
           if ((mask & occ) !== 0n) continue;
 
-          // Prism adjacency requirement
           if (needPrismAdjacency && (mask & prismBorder) === 0n) continue;
-
-          // Directed: sources that target current must touch this mask
           let ok = true;
           for (const srcMask of mustTouchMasksFromSources) {
             if ((mask & neighborOf(srcMask)) === 0n) { ok = false; break; }
           }
           if (!ok) continue;
 
-          // Directed: if current targets an earlier depth, it must touch that target
           const tDepth = targetDepthForDepth[depth];
           if (tDepth >= 0 && tDepth < depth) {
             const tgtMask = chosen[tDepth];
@@ -1034,7 +1199,6 @@ class App {
       return;
     }
 
-    // ---------- No constraints: multithreaded enumeration ----------
     const haveWorkers = typeof Worker !== 'undefined';
     const THREADS = Math.min(
       seeds.length,
@@ -1042,7 +1206,6 @@ class App {
     );
 
     if (!haveWorkers || THREADS <= 1) {
-      // Single-threaded enumeration up to MAX_SOLUTIONS
       const n = placements_ordered.length;
       const remain = new Array(n + 1).fill(0);
       for (let i = n - 1; i >= 0; i--) remain[i] = remain[i + 1] + sizes_ordered[i];
@@ -1075,7 +1238,6 @@ class App {
       return;
     }
 
-    // Worker pool enumeration (no constraints)
     const workerURL = createSolverWorkerURL();
     const workers = [];
     const chunks = chunk(seeds, THREADS);
@@ -1123,9 +1285,7 @@ class App {
     this.update_shape_list();
   }
 }
-
-/* Boot */
 const app = new App();
 </script>
-</body>
-</html>
+</body></html>
+
