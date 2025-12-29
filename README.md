@@ -1,4 +1,5 @@
-# mycopunk_find_upgrade_layout
-Tool to find upgrade layout in Mycopunk.
+# Mycopunk_UpgradeSovler
+Tool made to solve layouts in the Mycopunk upgrade grid
 
-https://shnst.github.io/mycopunk_find_upgrade_layout/
+Based on the mycopunk_find_upgrade_layout tool made by Shun Sato, all credits to him:
+https://github.com/shnst/mycopunk_find_upgrade_layout
