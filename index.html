@@ -385,16 +385,16 @@ function get_pivot(cells) {
 }
 function normalize_shape(cells) {
   if (!cells || !cells.length) return [];
-  let min_x = Infinity, min_y = Infinity;
-  for (const [x,y] of cells) { if (x < min_x) min_x = x; if (y < min_y) min_y = y; }
-  const normalized = [];
-  for (const [x,y] of cells) {
-    let nx = x - min_x;
-    let ny = y - min_y;
-    if (x % 2 === 1 && nx % 2 === 0) ny -= 1;
-    normalized.push([nx, ny]);
+  // Convert to axial coordinates to maintain structural integrity during translation
+  const axials = cells.map(c => oddq_to_axial(c));
+  let minQ = Infinity, minR = Infinity;
+  for (const [q, r] of axials) {
+    if (q < minQ) minQ = q;
+    if (r < minR) minR = r;
   }
-  const set = new Set(normalized.map(([a,b]) => toKey(a,b)));
+  // Subtract minimums and convert back to odd-q
+  const normalized = axials.map(([q, r]) => axial_to_oddq([q - minQ, r - minR]));
+  const set = new Set(normalized.map(([a, b]) => toKey(a, b)));
   return Array.from(set, fromKey).sort(cmpCoord);
 }
 
@@ -687,12 +687,16 @@ class App {
     window.addEventListener('mouseup', () => { isDragging = false; });
     window.addEventListener('touchend', () => { isDragging = false; });
 
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
-        const t = e.target;
-        if (t !== this.inpW && t !== this.inpH) { e.preventDefault(); this.add_shape(); }
-      }
-    });
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+    const t = e.target;
+    // Do not trigger add_shape if the user is typing in ANY input field (like maxSol)
+    if (t.tagName === 'INPUT') return;
+    
+    e.preventDefault(); 
+    this.add_shape();
+  }
+});
 
     this.shapes = [];
     this.color_index = 0;
