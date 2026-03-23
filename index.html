@@ -178,7 +178,6 @@
   .modalHeader { display: flex; justify-content: space-between; align-items: center; }
   .modalActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;}
 
-  /* Mobile Usability Overrides - Original Flex Layout Style */
   @media (max-width: 1080px) {
     body { height: auto; display: block; }
     main { grid-template-columns: 1fr; }
@@ -385,14 +384,12 @@ function get_pivot(cells) {
 }
 function normalize_shape(cells) {
   if (!cells || !cells.length) return [];
-  // Convert to axial coordinates to maintain structural integrity during translation
   const axials = cells.map(c => oddq_to_axial(c));
   let minQ = Infinity, minR = Infinity;
   for (const [q, r] of axials) {
     if (q < minQ) minQ = q;
     if (r < minR) minR = r;
   }
-  // Subtract minimums and convert back to odd-q
   const normalized = axials.map(([q, r]) => axial_to_oddq([q - minQ, r - minR]));
   const set = new Set(normalized.map(([a, b]) => toKey(a, b)));
   return Array.from(set, fromKey).sort(cmpCoord);
@@ -457,8 +454,6 @@ class HexBoard {
 
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    
-    // Performance: Grid Cache for Lag Fix
     this.gridCacheCanvas = document.createElement('canvas');
     this.gridCacheCtx = this.gridCacheCanvas.getContext('2d');
     this.needsGridUpdate = true;
@@ -569,8 +564,8 @@ class Shape {
     this.adjacentTo = null;
   }
 
-  drawToCanvas(canvas) {
-    const dpr = window.devicePixelRatio || 1;
+drawToCanvas(canvas) {
+    const dpr = (window.devicePixelRatio || 1) < 4 ? 4 : (window.devicePixelRatio || 1);
     const logicalW = 180;
     const logicalH = 100;
     canvas.width = logicalW * dpr;
@@ -583,22 +578,49 @@ class Shape {
     ctx.clearRect(0,0,logicalW,logicalH);
 
     const norm = normalize_shape(this.cells);
-    const radius = 12;
-    const dx = 1.5 * radius;
-    const dy = Math.sqrt(3) * radius;
+    if (!norm.length) return;
 
-    let maxx = 0, maxy = 0;
-    for (const [x,y] of norm) { if (x>maxx) maxx=x; if (y>maxy) maxy=y; }
+    let r = 12;
+    let dx, dy, maxy, pts, minPX, maxPX, minPY, maxPY, shapeW, shapeH;
 
-    const w = dx*maxx + 2*radius, h = dy*maxy + 2*radius;
-    const offx = (logicalW - w)/2 + radius;
-    const offy = (logicalH - h)/2 + radius;
+    const calculateLayout = (currentR) => {
+      dx = 1.5 * currentR;
+      dy = Math.sqrt(3) * currentR;
+      maxy = 0;
+      for (const [x,y] of norm) { if (y > maxy) maxy = y; }
 
-    for (const [x,y] of norm) {
-      const yDown = (maxy - y);
-      const cx = offx + dx * x;
-      const cy = offy + dy * yDown - (x % 2 ? 0 : (dy/2));
-      drawHex(ctx, cx, cy, radius, this.color, null, 0.8);
+      minPX = Infinity; maxPX = -Infinity; minPY = Infinity; maxPY = -Infinity;
+      pts = norm.map(([x,y]) => {
+        const yDown = (maxy - y);
+        const cx = dx * x;
+        const cy = dy * yDown - (x % 2 ? 0 : (dy/2));
+        
+        if (cx < minPX) minPX = cx; if (cx > maxPX) maxPX = cx;
+        if (cy < minPY) minPY = cy; if (cy > maxPY) maxPY = cy;
+        return [cx, cy];
+      });
+	  
+      shapeW = (maxPX - minPX) + (2 * currentR);
+      shapeH = (maxPY - minPY) + dy;
+    };
+	
+    calculateLayout(r);
+
+    const padding = 8;
+    const availableW = logicalW - padding;
+    const availableH = logicalH - padding;
+
+    if (shapeW > availableW || shapeH > availableH) {
+      const scale = Math.min(availableW / shapeW, availableH / shapeH);
+      r *= scale;
+      calculateLayout(r);
+    }
+	
+    const offx = (logicalW - shapeW) / 2 - minPX + r;
+    const offy = (logicalH - shapeH) / 2 - minPY + (dy / 2);
+
+    for (const [cx, cy] of pts) {
+      drawHex(ctx, cx + offx, cy + offy, r, this.color, null, 0.8);
     }
   }
 
@@ -690,7 +712,6 @@ class App {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
     const t = e.target;
-    // Do not trigger add_shape if the user is typing in ANY input field (like maxSol)
     if (t.tagName === 'INPUT') return;
     
     e.preventDefault(); 
@@ -944,11 +965,7 @@ find_placement() {
     const totalCells = W * H;
     const requestedMax = Math.max(1, Math.min(200, Number(document.getElementById('maxSol').value) || 5));
     const disableRotation = document.getElementById('disableRotation')?.checked ?? false;
-
-    // 1. PRE-CALCULATE NEIGHBORS
     const neighborLookup = this.buildNeighborMasks(W, H);
-    
-    // Fast bit indexing without strings
     const getAdjMask = (m) => {
       let adjM = 0n, temp = m;
       while (temp > 0n) {
@@ -969,7 +986,6 @@ find_placement() {
       return m;
     })();
 
-    // 2. DATA PREPARATION
     let shapeData = this.shapes.map((shape, idx) => {
       const orientations = disableRotation ? [shape.cells] : shape.rotations();
       const placements = [];
@@ -1005,21 +1021,16 @@ find_placement() {
 
     const n = shapeData.length;
     const solutions = [];
-    const solutionOrder = new Array(n); // Tracks which shape was placed at which depth
-
-    // 3. THE DYNAMIC SOLVER (MRV + Forward Pruning)
+    const solutionOrder = new Array(n);
     const solve = (remainingIndices, occupied, prismAdjUnion, placedResults) => {
       if (solutions.length >= requestedMax) return;
       if (remainingIndices.length === 0) {
-        // Reconstruct solution in original order
         const sol = new Array(n);
         for(let r of placedResults) sol[r.id] = r.mask;
         solutions.push(sol);
         return;
       }
 
-      // --- DYNAMIC MRV ---
-      // Find the shape with the FEWEST possible placements
       let bestIdxInRemaining = -1;
       let bestCandidates = null;
       let minCount = Infinity;
@@ -1027,8 +1038,6 @@ find_placement() {
       for (let i = 0; i < remainingIndices.length; i++) {
         const sIdx = remainingIndices[i];
         const shape = shapeData[sIdx];
-        
-        // Filter possible placements for this shape based on current 'occupied'
         const mustTouch = (shape.adjTo !== -1) ? 
             placedResults.find(r => r.id === shape.adjTo)?.adj : 0n;
         
@@ -1041,17 +1050,16 @@ find_placement() {
         }
 
         const count = candidates.length;
-        if (count === 0) return; // Failure Pruning: This branch is impossible
+        if (count === 0) return;
 
         if (count < minCount) {
           minCount = count;
           bestIdxInRemaining = i;
           bestCandidates = candidates;
-          if (count === 1) break; // Optimization: Found a "Hidden Single"
+          if (count === 1) break;
         }
       }
 
-      // Pick the best shape to process
       const shapeId = remainingIndices[bestIdxInRemaining];
       const nextRemaining = remainingIndices.filter((_, i) => i !== bestIdxInRemaining);
       const isPrism = shapeData[shapeId].prism;
@@ -1071,7 +1079,6 @@ find_placement() {
       }
     };
 
-    // Initial call
     const initialIndices = shapeData.map((_, i) => i);
     solve(initialIndices, 0n, 0n, []);
 
@@ -1082,13 +1089,11 @@ find_placement() {
       this.board.drawMessage(`No placement available (${duration}ms)`);
       this.requestRedraw();
     } else {
-      // Setup helpers for display
       const indexToCoord = [];
       for(let i=0; i<totalCells; i++) indexToCoord.push([i % W, Math.floor(i / W)]);
       const powIndex = new Map();
       for(let i=0; i<totalCells; i++) powIndex.set((1n << BigInt(i)).toString(), i);
 
-      // Map solutions back to original shape ordering for the displayer
       this.solutionMasks = solutions; 
       this.decodeHelpers = { powIndex, indexToCoord, order: Array.from({length: n}, (_, i) => i) };
       this.applySolutionByIndex(0);
