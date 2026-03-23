@@ -155,8 +155,8 @@
   .btn-code:hover { background: rgba(46, 139, 87, 0.2); }
   [data-theme="dark"] .btn-code { color: #4ade80; border-color: #4ade80; }
 
-  .adjRow { display:flex; align-items:center; gap:6px; width: 100%; }
-  .adjRow .check { margin-right: auto; }
+  .adjRow { display:flex; align-items:center; gap:6px; width: 100%; flex-wrap: wrap; }
+  .adjRow .check { margin-right: 8px; }
   .adjRow input[type="number"] { width: 64px; padding:6px 8px; border:1px solid var(--border-input); border-radius:8px; background: var(--bg-input); color: var(--fg-primary); }
   .indexBadge { font-weight:600; }
 
@@ -565,6 +565,7 @@ class Shape {
     this.color = color;
     this.pivot = get_pivot(this.cells) || [0,0];
     this.prism = false;
+    this.noEdge = false;
     this.adjacentTo = null;
   }
 
@@ -834,6 +835,7 @@ class App {
       bottomRow.className = 'shapeBottom';
       const adjRow = document.createElement('div');
       adjRow.className = 'adjRow';
+      
       const prismWrap = document.createElement('label');
       prismWrap.className = 'check';
       const prismChk = document.createElement('input');
@@ -843,6 +845,17 @@ class App {
       prismTxt.textContent = 'Prism'; prismTxt.className = 'hint';
       prismWrap.appendChild(prismTxt); prismWrap.appendChild(prismChk);
       adjRow.appendChild(prismWrap);
+
+      const edgeWrap = document.createElement('label');
+      edgeWrap.className = 'check';
+      const edgeChk = document.createElement('input');
+      edgeChk.type = 'checkbox'; edgeChk.checked = shape.noEdge;
+      edgeChk.addEventListener('change', () => { shape.noEdge = edgeChk.checked; });
+      const edgeTxt = document.createElement('span');
+      edgeTxt.textContent = 'Boundary'; edgeTxt.className = 'hint';
+      edgeWrap.appendChild(edgeTxt); edgeWrap.appendChild(edgeChk);
+      adjRow.appendChild(edgeWrap);
+
       const adjLbl = document.createElement('span');
       adjLbl.className = 'hint'; adjLbl.textContent = ' Adj to ';
       const adjInp = document.createElement('input');
@@ -893,172 +906,192 @@ class App {
     this.updateSolutionControls();
   }
 
-  buildNeighborMasks(W, H) {
-    const idx_of = (x,y) => y*W + x;
-    const masks = new Array(W*H).fill(0n);
-    for (let y=0;y<H;y++) {
-      for (let x=0;x<W;x++) {
-        const [q,r] = oddq_to_axial([x,y]);
-        const nbrsAx = [[+1,0],[+1,-1],[0,-1],[-1,0],[-1,+1],[0,+1]];
-        let mask = 0n;
-        for (const [dq,dr] of nbrsAx) {
-          const [qq, rr] = [q+dq, r+dr];
-          const [nx, ny] = axial_to_oddq([qq, rr]);
-          if (0 <= nx && nx < W && 0 <= ny && ny < H) {
-            mask |= (1n << BigInt(idx_of(nx, ny)));
-          }
+buildNeighborMasks(W, H) {
+    const masks = [];
+    for (let i = 0; i < W * H; i++) {
+      const x = i % W;
+      const y = Math.floor(i / W);
+      const [q, r] = oddq_to_axial([x, y]);
+      const nbrsAx = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+      let m = 0n;
+      for (const [dq, dr] of nbrsAx) {
+        const [nx, ny] = axial_to_oddq([q + dq, r + dr]);
+        if (nx >= 0 && nx < W && ny >= 0 && ny < H) {
+          m |= (1n << BigInt(ny * W + nx));
         }
-        masks[idx_of(x,y)] = mask;
       }
+      masks.push(m);
     }
     return masks;
   }
 
-  find_placement() {
+find_placement() {
+    const startTime = performance.now();
     this.board.hideMessage();
     this.board.filled.clear();
-    this.solutionMasks = []; this.solutionIndex = 0; this.decodeHelpers = null; this.updateSolutionControls();
+    this.solutionMasks = [];
+    this.solutionIndex = 0;
+    this.decodeHelpers = null;
+    this.updateSolutionControls();
 
     if (this.shapes.length === 0) { this.requestRedraw(); return; }
 
     const W = this.board.width, H = this.board.height;
-    const BOARD_CELLS = W * H;
-    const total_cells = this.shapes.reduce((s,sh) => s + sh.cells.length, 0);
-    if (total_cells > BOARD_CELLS) { this.requestRedraw(); this.board.drawMessage('No placement available'); return; }
-
+    const totalCells = W * H;
     const requestedMax = Math.max(1, Math.min(200, Number(document.getElementById('maxSol').value) || 5));
-    const MAX_SOLUTIONS = Math.min(requestedMax, 100);
-
     const disableRotation = document.getElementById('disableRotation')?.checked ?? false;
-    const idx_of = (x,y) => y*W + x;
 
-    const powIndex = new Map();
-    const indexToCoord = [];
-    for (let i=0;i<BOARD_CELLS;i++) {
-      const bit = 1n << BigInt(i);
-      powIndex.set(bit.toString(), i);
-      indexToCoord.push([i % W, Math.floor(i / W)]);
-    }
+    // 1. PRE-CALCULATE NEIGHBORS
+    const neighborLookup = this.buildNeighborMasks(W, H);
+    
+    // Fast bit indexing without strings
+    const getAdjMask = (m) => {
+      let adjM = 0n, temp = m;
+      while (temp > 0n) {
+        const lsb = temp & -temp;
+        const bitIdx = lsb.toString(2).length - 1; 
+        adjM |= neighborLookup[bitIdx];
+        temp ^= lsb;
+      }
+      return adjM;
+    };
 
-    const all_shape_placements = [];
-    const shape_sizes = [];
-    const prism_flags = this.shapes.map(s => !!s.prism);
-    const adjacentTo = this.shapes.map((s,i) => Number.isInteger(s.adjacentTo) ? s.adjacentTo : -1);
+    const forbiddenMask = (() => {
+      let m = 0n;
+      for (let i = 0; i < totalCells; i++) {
+        const x = i % W, y = Math.floor(i / W);
+        if (x === W - 1 || y === 0) m |= (1n << BigInt(i));
+      }
+      return m;
+    })();
 
-    for (const shape of this.shapes) {
+    // 2. DATA PREPARATION
+    let shapeData = this.shapes.map((shape, idx) => {
       const orientations = disableRotation ? [shape.cells] : shape.rotations();
-      const seenOffsets = new Set();
-      const rotationOffsets = [];
+      const placements = [];
+      const seen = new Set();
       for (const rot of orientations) {
         const offs = offsetsFromPivotAxial(rot);
         const key = offsetsKey(offs);
-        if (!seenOffsets.has(key)) { seenOffsets.add(key); rotationOffsets.push(offs); }
-      }
-      let placements = [];
-      shape_sizes.push(shape.cells.length);
-      for (const offs of rotationOffsets) {
-        for (let py=0; py<H; py++) {
-          for (let px=0; px<W; px++) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+        for (let py = 0; py < H; py++) {
+          for (let px = 0; px < W; px++) {
             const [pq, pr] = oddq_to_axial([px, py]);
-            let mask = 0n, ok = true;
+            let m = 0n, ok = true;
             for (const [dq, dr] of offs) {
-              const q = pq + dq, r = pr + dr;
-              const [cx, cy] = axial_to_oddq([q, r]);
-              if (!(0 <= cx && cx < W && 0 <= cy && cy < H)) { ok = false; break; }
-              mask |= (1n << BigInt(idx_of(cx, cy)));
+              const [cx, cy] = axial_to_oddq([pq + dq, pr + dr]);
+              if (cx >= 0 && cx < W && cy >= 0 && cy < H) m |= (1n << BigInt(cy * W + cx));
+              else { ok = false; break; }
             }
-            if (ok) placements.push(mask);
+            if (ok && (!shape.noEdge || (m & forbiddenMask) === 0n)) {
+              placements.push({ mask: m, adj: getAdjMask(m) });
+            }
           }
         }
       }
-      if (placements.length === 0) { this.requestRedraw(); this.board.drawMessage('No placement available'); return; }
-      all_shape_placements.push(Array.from(new Set(placements.map(m => m.toString())), s => BigInt(s)));
-    }
+      return { 
+        id: idx, 
+        placements, 
+        prism: !!shape.prism, 
+        adjTo: Number.isInteger(shape.adjacentTo) ? shape.adjacentTo : -1,
+        color: shape.color
+      };
+    });
 
-    const order = [...all_shape_placements.keys()].sort((a,b) => all_shape_placements[a].length - all_shape_placements[b].length);
-    const placements_ordered = order.map(i => all_shape_placements[i]);
-    const sizes_ordered = order.map(i => shape_sizes[i]);
-    const prism_ordered = order.map(i => prism_flags[i]);
-
-    const originalIndexToDepth = new Map(order.map((orig, d) => [orig, d]));
-    const targetDepthForDepth = new Array(order.length).fill(-1);
-    const sourcesForDepth = Array.from({length: order.length}, () => []);
-    
-    for (let orig = 0; orig < adjacentTo.length; orig++) {
-      const targOrig = adjacentTo[orig];
-      if (!(targOrig >= 0) || targOrig === orig || targOrig >= adjacentTo.length) continue;
-      const dSrc = originalIndexToDepth.get(orig);
-      const dTgt = originalIndexToDepth.get(targOrig);
-      if (dSrc !== undefined && dTgt !== undefined) {
-        targetDepthForDepth[dSrc] = dTgt;
-        sourcesForDepth[dTgt].push(dSrc);
-      }
-    }
-
-    const neighborMasks = this.buildNeighborMasks(W, H);
-    const neighborOf = (mask) => {
-      let res = 0n, m = mask;
-      while (m) {
-        const lsb = m & (-m);
-        const bit = powIndex.get(lsb.toString());
-        res |= neighborMasks[bit];
-        m ^= lsb;
-      }
-      return res;
-    };
-
-    const finishWhenReady = (solutions) => {
-      if (!solutions.length) { this.requestRedraw(); this.board.drawMessage('No placement available'); return; }
-      this.solutionMasks = solutions;
-      this.solutionIndex = 0;
-      this.decodeHelpers = { powIndex, indexToCoord, order };
-      this.applySolutionByIndex(0);
-    };
-
-    const n = placements_ordered.length;
-    const remain = new Array(n + 1).fill(0);
-    for (let i = n - 1; i >= 0; i--) remain[i] = remain[i + 1] + sizes_ordered[i];
-
-    const bitCount = (x) => { let c = 0; while (x) { x &= (x - 1n); c++; } return c; };
+    const n = shapeData.length;
     const solutions = [];
+    const solutionOrder = new Array(n); // Tracks which shape was placed at which depth
 
-    const dfs = (depth, occ, chosen, prismUnion, prismPlacedCount) => {
-      if (solutions.length >= MAX_SOLUTIONS) return false;
-      if (remain[depth] > (BOARD_CELLS - bitCount(occ))) return true;
-      if (depth === n) { solutions.push(chosen.slice()); return solutions.length < MAX_SOLUTIONS; }
-
-      const plist = placements_ordered[depth];
-      const isPrism = prism_ordered[depth];
-      const mustTouchMasksFromSources = sourcesForDepth[depth].filter(s => s < depth).map(s => chosen[s]);
-      const prismBorder = (isPrism && prismPlacedCount > 0) ? neighborOf(prismUnion) : 0n;
-
-      for (let i = 0; i < plist.length; i++) {
-        const mask = plist[i];
-        if ((mask & occ) !== 0n) continue;
-        if (prismBorder !== 0n && (mask & prismBorder) === 0n) continue;
-        let ok = true;
-        for (const srcMask of mustTouchMasksFromSources) {
-          if ((mask & neighborOf(srcMask)) === 0n) { ok = false; break; }
-        }
-        if (!ok) continue;
-        const tDepth = targetDepthForDepth[depth];
-        if (tDepth >= 0 && tDepth < depth) {
-            if ((chosen[tDepth] & neighborOf(mask)) === 0n) continue;
-        }
-        chosen[depth] = mask;
-        if (!dfs(depth + 1, occ | mask, chosen, isPrism ? (prismUnion | mask) : prismUnion, isPrism ? (prismPlacedCount + 1) : prismPlacedCount)) return false;
+    // 3. THE DYNAMIC SOLVER (MRV + Forward Pruning)
+    const solve = (remainingIndices, occupied, prismAdjUnion, placedResults) => {
+      if (solutions.length >= requestedMax) return;
+      if (remainingIndices.length === 0) {
+        // Reconstruct solution in original order
+        const sol = new Array(n);
+        for(let r of placedResults) sol[r.id] = r.mask;
+        solutions.push(sol);
+        return;
       }
-      return true;
+
+      // --- DYNAMIC MRV ---
+      // Find the shape with the FEWEST possible placements
+      let bestIdxInRemaining = -1;
+      let bestCandidates = null;
+      let minCount = Infinity;
+
+      for (let i = 0; i < remainingIndices.length; i++) {
+        const sIdx = remainingIndices[i];
+        const shape = shapeData[sIdx];
+        
+        // Filter possible placements for this shape based on current 'occupied'
+        const mustTouch = (shape.adjTo !== -1) ? 
+            placedResults.find(r => r.id === shape.adjTo)?.adj : 0n;
+        
+        const candidates = [];
+        for (let p of shape.placements) {
+          if ((p.mask & occupied) !== 0n) continue;
+          if (mustTouch && (p.mask & mustTouch) === 0n) continue;
+          if (shape.prism && prismAdjUnion !== 0n && (p.mask & prismAdjUnion) === 0n) continue;
+          candidates.push(p);
+        }
+
+        const count = candidates.length;
+        if (count === 0) return; // Failure Pruning: This branch is impossible
+
+        if (count < minCount) {
+          minCount = count;
+          bestIdxInRemaining = i;
+          bestCandidates = candidates;
+          if (count === 1) break; // Optimization: Found a "Hidden Single"
+        }
+      }
+
+      // Pick the best shape to process
+      const shapeId = remainingIndices[bestIdxInRemaining];
+      const nextRemaining = remainingIndices.filter((_, i) => i !== bestIdxInRemaining);
+      const isPrism = shapeData[shapeId].prism;
+
+      for (let p of bestCandidates) {
+        placedResults.push({ id: shapeId, mask: p.mask, adj: p.adj });
+        
+        solve(
+          nextRemaining, 
+          occupied | p.mask, 
+          isPrism ? (prismAdjUnion | p.adj) : prismAdjUnion,
+          placedResults
+        );
+
+        placedResults.pop();
+        if (solutions.length >= requestedMax) return;
+      }
     };
 
-    for (let s = 0; s < placements_ordered[0].length && solutions.length < MAX_SOLUTIONS; s++) {
-      const chosen = new Array(n).fill(0n);
-      chosen[0] = placements_ordered[0][s];
-      dfs(1, chosen[0], chosen, prism_ordered[0] ? chosen[0] : 0n, prism_ordered[0] ? 1 : 0);
+    // Initial call
+    const initialIndices = shapeData.map((_, i) => i);
+    solve(initialIndices, 0n, 0n, []);
+
+    const duration = (performance.now() - startTime).toFixed(2);
+    console.log(`[Solver] Finished in ${duration}ms`);
+
+    if (solutions.length === 0) {
+      this.board.drawMessage(`No placement available (${duration}ms)`);
+      this.requestRedraw();
+    } else {
+      // Setup helpers for display
+      const indexToCoord = [];
+      for(let i=0; i<totalCells; i++) indexToCoord.push([i % W, Math.floor(i / W)]);
+      const powIndex = new Map();
+      for(let i=0; i<totalCells; i++) powIndex.set((1n << BigInt(i)).toString(), i);
+
+      // Map solutions back to original shape ordering for the displayer
+      this.solutionMasks = solutions; 
+      this.decodeHelpers = { powIndex, indexToCoord, order: Array.from({length: n}, (_, i) => i) };
+      this.applySolutionByIndex(0);
+      document.getElementById('solInfo').textContent = `1 / ${solutions.length} (${duration}ms)`;
     }
-    finishWhenReady(solutions);
   }
-}
+ }
 const app = new App();
 </script>
 </body></html>
