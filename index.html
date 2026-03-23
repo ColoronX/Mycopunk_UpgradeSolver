@@ -7,7 +7,7 @@
   gtag('config', 'G-NTX1YS21Y0');
 </script>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Mycopunk Upgrade Solver & Generator</title>
 <style>
   :root { 
@@ -62,7 +62,7 @@
     --badge-bg: #333333;
   }
 
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     color: var(--fg-primary); background: var(--bg-body);
@@ -76,28 +76,26 @@
   button {
     padding: 8px 12px; border: 1px solid var(--border-input); border-radius: 8px; 
     background: var(--bg-input); color: var(--fg-primary); cursor: pointer;
+    white-space: nowrap;
   }
   button:hover { border-color: var(--border-hover); background: var(--bg-hover); }
   
   main { display: grid; grid-template-columns: 1fr var(--panel-w); min-height: 0; }
  
-  #boardWrap {
-    position: relative;
-    display: grid;
-    place-items: start center;
-    min-width: 0;
-    min-height: 0;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    padding: 12px; 
-  }
-  #board { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; max-width: 100%; height: auto; }
+	#boardWrap {
+	  position: relative; display: grid; place-items: start center; min-width: 0; min-height: 0; 
+	  overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: auto; padding: 12px; 
+	}
+
+	#board { 
+	  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; 
+	  max-width: 100%; height: auto; display: block; touch-action: manipulation;
+	}
   
   #overlayMessage {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
     font-size: 20px; font-weight: 600; color: #ff5555; background: var(--overlay-bg);
-    pointer-events: auto;
+    pointer-events: auto; z-index: 100;
   }
   
   aside {
@@ -125,7 +123,11 @@
   .shapeMeta { display:flex; align-items:center; gap:10px; } 
   .midControls { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
 
-  .shapeItem canvas { background: var(--bg-panel); border: 1px dashed var(--border); border-radius: 8px; }
+  .shapeItem canvas { 
+    background: var(--bg-panel); 
+    border: 1px dashed var(--border); 
+    border-radius: 8px; 
+  }
   .shapeItem button { padding: 6px 8px; }
   .hint { opacity: 0.8; font-size: 12px; color: var(--fg-secondary); }
   .grow { flex: 1 1 auto; }
@@ -175,6 +177,20 @@
   }
   .modalHeader { display: flex; justify-content: space-between; align-items: center; }
   .modalActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;}
+
+  /* Mobile Usability Overrides - Original Flex Layout Style */
+  @media (max-width: 1080px) {
+    body { height: auto; display: block; }
+    main { grid-template-columns: 1fr; }
+    aside { border-left: none; border-top: 1px solid var(--border); min-height: 500px; }
+    header { position: sticky; top: 0; z-index: 100; padding: 8px; }
+    .grow { display: none; }
+    .solControls { width: 100%; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 5px; }
+    .shapeMid { grid-template-columns: 1fr; }
+    .midControls { flex-direction: row; justify-content: flex-start; gap: 10px; }
+    .shapeMeta canvas { width: 100% !important; height: auto !important; }
+    #codeContent { width: 95%; height: 85vh; padding: 15px; }
+  }
 </style>
 </head>
 <body>
@@ -184,7 +200,7 @@
     <button id="btnClear">🧹 Clear</button>
 
     <label class="check" title="Include rotated variants of shapes during search">
-      <span class="hint">Disable Rotation</span>
+      <span class="hint">No Rotation</span>
       <input type="checkbox" id="disableRotation">
     </label>
 
@@ -308,27 +324,16 @@ function normalizeForExport(cells) {
         if(x < minX) minX = x;
         if(y < minY) minY = y;
     });
-
     const norm = [];
     let newMinY = Infinity;
-
     cells.forEach(([x,y]) => {
         let nx = x - minX;
         let ny = y - minY;
-        
-        if ((x % 2 !== 0) && (nx % 2 === 0)) {
-            ny += 1; 
-        }
-        
+        if ((x % 2 !== 0) && (nx % 2 === 0)) { ny += 1; }
         norm.push([nx, ny]);
         if (ny < newMinY) newMinY = ny;
     });
-
-    if (newMinY < 0) {
-        norm.forEach(c => c[1] -= newMinY);
-    } else if (newMinY > 0) {
-        norm.forEach(c => c[1] -= newMinY);
-    }
+    if (newMinY < 0) { norm.forEach(c => c[1] -= newMinY); } else if (newMinY > 0) { norm.forEach(c => c[1] -= newMinY); }
     return norm;
 }
 
@@ -336,26 +341,21 @@ function generateCSharp(cells, autoConnect) {
     const norm = normalizeForExport(cells);
     const map = new Map();
     norm.forEach(([x,y]) => map.set(`${x},${y}`, { x, y, degree: 0 }));
-
     map.forEach(info => {
         const isEven = (info.x % 2 === 0);
         getNeighborOffsets(isEven).forEach(o => {
             if (map.has(`${info.x + o.dx},${info.y + o.dy}`)) info.degree++;
         });
     });
-
     const hasPriority = (a, b) => {
         if (a.degree !== b.degree) return a.degree > b.degree;
         if (a.y !== b.y) return a.y < b.y;
         return a.x < b.x;
     };
-
     let w = 0, h = 0;
     norm.forEach(([x,y]) => { w = Math.max(w, x); h = Math.max(h, y); });
     w = Math.max(3, w + 1); h = Math.max(3, h + 1);
-    
     norm.sort((a,b) => a[0] - b[0] || a[1] - b[1]);
-
     let sb = `protected override HexMap Pattern\n{\n\tget\n\t{\n\t\tHexMap m = new HexMap(${w}, ${h});\n`;
     norm.forEach(([x,y]) => {
         sb += `\t\tm[${x}, ${y}].enabled = true;`;
@@ -365,9 +365,7 @@ function generateCSharp(cells, autoConnect) {
             const flags = [];
             getNeighborOffsets(isEven).forEach(o => {
                 const nKey = `${x + o.dx},${y + o.dy}`;
-                if (map.has(nKey) && hasPriority(me, map.get(nKey))) {
-                    flags.push(`HexMap.Direction.${o.name}`);
-                }
+                if (map.has(nKey) && hasPriority(me, map.get(nKey))) { flags.push(`HexMap.Direction.${o.name}`); }
             });
             if (flags.length) sb += ` m[${x}, ${y}].connections = ${flags.join(" | ")};`;
         }
@@ -399,26 +397,7 @@ function normalize_shape(cells) {
   const set = new Set(normalized.map(([a,b]) => toKey(a,b)));
   return Array.from(set, fromKey).sort(cmpCoord);
 }
-function move_shape(cells, dx, dy, max_width, max_height) {
-  if (!cells || !cells.length) return [];
-  const [px,py] = get_pivot(cells);
-  const pivot_parity = px % 2;
-  const moved = [];
-  for (const [x,y] of cells) {
-    const offset_x = x - px;
-    const offset_y = y - py;
-    let new_x = px + dx + offset_x;
-    let new_y = py + dy + offset_y;
-    if (!(x === px && y === py) && (x % 2 !== pivot_parity)) {
-      if (x % 2 === 1 && new_x % 2 === 0) new_y -= 1;
-      else if (x % 2 === 0 && new_x % 2 === 1) new_y += 1;
-    }
-    if (!(0 <= new_x && new_x < max_width && 0 <= new_y && new_y < max_height)) return null;
-    moved.push([new_x, new_y]);
-  }
-  const set = new Set(moved.map(([a,b])=>toKey(a,b)));
-  return Array.from(set, fromKey).sort(cmpCoord);
-}
+
 function rotate_cells_about_pivot_oddq(cells, times) {
   if (!cells || !cells.length) return [];
   let s = ((times % 6) + 6) % 6;
@@ -436,12 +415,7 @@ function rotate_cells_about_pivot_oddq(cells, times) {
   }
   return Array.from(out, fromKey).sort(cmpCoord);
 }
-function rotate_shape(cells, times, max_width, max_height) {
-  if (!cells || !cells.length) return [];
-  const rotated = rotate_cells_about_pivot_oddq(cells, times);
-  for (const [x,y] of rotated) if (!(0 <= x && x < max_width && 0 <= y && y < max_height)) return null;
-  return rotated;
-}
+
 function offsetsFromPivotAxial(cells) {
   const pivot = get_pivot(cells);
   const [pq, pr] = oddq_to_axial(pivot);
@@ -454,6 +428,7 @@ function offsetsFromPivotAxial(cells) {
   return offs;
 }
 function offsetsKey(offs) { return offs.map(([dq,dr]) => dq + "," + dr).join(";"); }
+
 function drawHex(ctx, cx, cy, r, fill, stroke, alpha=1) {
   const strokeColor = getComputedStyle(document.documentElement).getPropertyValue('--stroke').trim();
   ctx.save();
@@ -482,6 +457,12 @@ class HexBoard {
 
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    
+    // Performance: Grid Cache for Lag Fix
+    this.gridCacheCanvas = document.createElement('canvas');
+    this.gridCacheCtx = this.gridCacheCanvas.getContext('2d');
+    this.needsGridUpdate = true;
+
     this.filled = new Map();
     this.hexCenters = new Map();
 
@@ -495,7 +476,7 @@ class HexBoard {
     for (let y=0;y<this.height;y++) for (let x=0;x<this.width;x++) this.cells.push([x,y]);
     this.clear_all();
     this.updateCanvasSize();
-    this.draw();
+    this.needsGridUpdate = true;
   }
 
   updateCanvasSize() {
@@ -505,6 +486,9 @@ class HexBoard {
     const pxH = Math.ceil(this.marginY * 2 + spanY);
     this.canvas.width = pxW;
     this.canvas.height = pxH;
+    
+    this.gridCacheCanvas.width = pxW;
+    this.gridCacheCanvas.height = pxH;
   }
   
   set_cell(mouseX, mouseY, mode) {
@@ -528,26 +512,34 @@ class HexBoard {
     return [draw_x, draw_y];
   }
 
-  draw() {
-    const ctx = this.ctx;
+  updateGridCache() {
+    const ctx = this.gridCacheCtx;
     const emptyColor = getComputedStyle(document.body).getPropertyValue('--hex-empty').trim();
-    const fillColor = getComputedStyle(document.body).getPropertyValue('--hex-fill').trim();
-    
-    ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+    ctx.clearRect(0,0,this.gridCacheCanvas.width,this.gridCacheCanvas.height);
     this.hexCenters.clear();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '10px system-ui';
 
     for (const [x,y] of this.cells) {
       const [cx,cy] = this.cell_center(x,y);
-      const val = this.filled.get(toKey(x,y));
-      let color = val;
-      if (!val) color = emptyColor;
-      else if (val === "black") color = fillColor;
-
-      drawHex(ctx, cx, cy, this.radius, color, null, 1);
+      drawHex(ctx, cx, cy, this.radius, emptyColor, null, 1);
       this.hexCenters.set(toKey(x,y), [cx,cy]);
+    }
+    this.needsGridUpdate = false;
+  }
+
+  draw() {
+    if (this.needsGridUpdate) this.updateGridCache();
+    
+    const ctx = this.ctx;
+    const fillColor = getComputedStyle(document.body).getPropertyValue('--hex-fill').trim();
+    
+    ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+    ctx.drawImage(this.gridCacheCanvas, 0, 0);
+
+    for (const [key, colorVal] of this.filled.entries()) {
+        const [x,y] = fromKey(key);
+        const [cx,cy] = this.cell_center(x,y);
+        const color = (colorVal === "black") ? fillColor : colorVal;
+        drawHex(ctx, cx, cy, this.radius, color, null, 1);
     }
   }
 
@@ -564,19 +556,6 @@ class HexBoard {
     delete overlay.dataset.active;
   }
 
-  toggle_cell(mouseX, mouseY) {
-    let chosen = null, bestD2 = Infinity;
-    for (const [k,[cx,cy]] of this.hexCenters.entries()) {
-      const dx = mouseX - cx, dy = mouseY - cy;
-      const d2 = dx*dx + dy*dy;
-      if (d2 < this.radius*this.radius && d2 < bestD2) { bestD2 = d2; chosen = k; }
-    }
-    if (!chosen) return false;
-    if (this.filled.has(chosen)) this.filled.delete(chosen);
-    else this.filled.set(chosen, "black");
-    return true;
-  }
-
   clear_all() { this.filled.clear(); }
 }
 
@@ -590,10 +569,19 @@ class Shape {
   }
 
   drawToCanvas(canvas) {
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    const norm = normalize_shape(this.cells);
+    const dpr = window.devicePixelRatio || 1;
+    const logicalW = 180;
+    const logicalH = 100;
+    canvas.width = logicalW * dpr;
+    canvas.height = logicalH * dpr;
+    canvas.style.width = logicalW + 'px';
+    canvas.style.height = logicalH + 'px';
 
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0,0,logicalW,logicalH);
+
+    const norm = normalize_shape(this.cells);
     const radius = 12;
     const dx = 1.5 * radius;
     const dy = Math.sqrt(3) * radius;
@@ -602,8 +590,8 @@ class Shape {
     for (const [x,y] of norm) { if (x>maxx) maxx=x; if (y>maxy) maxy=y; }
 
     const w = dx*maxx + 2*radius, h = dy*maxy + 2*radius;
-    const offx = (canvas.width - w)/2 + radius;
-    const offy = (canvas.height - h)/2 + radius;
+    const offx = (logicalW - w)/2 + radius;
+    const offy = (logicalH - h)/2 + radius;
 
     for (const [x,y] of norm) {
       const yDown = (maxy - y);
@@ -623,62 +611,13 @@ class Shape {
     }
     return res;
   }
-
-  rotate_about_pivot(times) { return rotate_cells_about_pivot_oddq(this.cells, times); }
-}
-
-function createSolverWorkerURL() {
-  const src = `
-    self.onmessage = (e) => {
-      const { placements_ordered, sizes_ordered, board_cells, seeds, limit } = e.data;
-      const n = placements_ordered.length;
-
-      const remain = new Array(n + 1).fill(0);
-      for (let i = n - 1; i >= 0; i--) remain[i] = remain[i + 1] + sizes_ordered[i];
-
-      function bitCount(x) { let c = 0; while (x) { x &= (x - 1n); c++; } return c; }
-
-      const solutions = [];
-
-      function dfs(depth, occ, chosen) {
-        if (solutions.length >= limit) return false;
-        const free = board_cells - bitCount(occ);
-        if (remain[depth] > free) return false;
-        if (depth === n) { solutions.push(chosen.slice()); return solutions.length < limit; }
-
-        const plist = placements_ordered[depth];
-        for (let i = 0; i < plist.length; i++) {
-          const mask = plist[i];
-          if ((mask & occ) !== 0n) continue;
-          chosen[depth] = mask;
-          if (!dfs(depth + 1, occ | mask, chosen)) return false;
-        }
-        return true;
-      }
-
-      for (let s = 0; s < seeds.length; s++) {
-        if (solutions.length >= limit) break;
-        const seed = seeds[s];
-        const chosen = new Array(n).fill(0n);
-        chosen[0] = seed;
-        dfs(1, seed, chosen);
-      }
-      postMessage({ ok: solutions.length > 0, solutions });
-    };
-  `;
-  return URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
-}
-function chunk(arr, k) {
-  const out = [];
-  const size = Math.ceil(arr.length / k);
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
 }
 
 class App {
   constructor() {
     this.canvas = document.getElementById('board');
     this.board = new HexBoard(7, 6, this.canvas);
+    this.needsDraw = false;
 
     document.getElementById('btnAdd').addEventListener('click', () => this.add_shape());
     document.getElementById('btnSolve').addEventListener('click', () => this.find_placement());
@@ -713,38 +652,40 @@ class App {
       const rect = this.canvas.getBoundingClientRect();
       const scaleX = this.canvas.width  / rect.width;
       const scaleY = this.canvas.height / rect.height;
-      return [(ev.clientX - rect.left) * scaleX, (ev.clientY - rect.top) * scaleY];
+      const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+      return [(clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY];
     };
 
-    this.canvas.addEventListener('mousedown', (ev) => {
+    const handleStart = (ev) => {
       const [x, y] = getMousePos(ev);
-      const currentState = this.board.set_cell(x, y, null);
-      if (currentState === null) return;
-
+      const hit = this.board.set_cell(x, y, null);
+      if (hit === null) return false;
       isDragging = true;
-      dragFillMode = !currentState;
-      
-      if (this.board.set_cell(x, y, dragFillMode)) this.redraw();
-    });
+      dragFillMode = !hit;
+      this.board.set_cell(x, y, dragFillMode);
+      this.requestRedraw();
+      return true;
+    };
 
-    this.canvas.addEventListener('mousemove', (ev) => {
+    const handleMove = (ev) => {
       if (!isDragging) return;
       const [x, y] = getMousePos(ev);
-      if (this.board.set_cell(x, y, dragFillMode)) this.redraw();
-    });
+      if (this.board.set_cell(x, y, dragFillMode)) this.requestRedraw();
+    };
+
+    this.canvas.addEventListener('mousedown', handleStart);
+    this.canvas.addEventListener('mousemove', handleMove);
+    this.canvas.addEventListener('touchstart', (ev) => {
+        if (handleStart(ev)) if (ev.cancelable) ev.preventDefault();
+    }, { passive: false });
+    this.canvas.addEventListener('touchmove', (ev) => {
+        if (isDragging) { handleMove(ev); if (ev.cancelable) ev.preventDefault(); }
+    }, { passive: false });
 
     window.addEventListener('mouseup', () => { isDragging = false; });
+    window.addEventListener('touchend', () => { isDragging = false; });
 
-    document.addEventListener('click', (ev) => {
-      const overlay = document.getElementById('overlayMessage');
-      if (overlay?.dataset.active === '1') {
-        this.board.hideMessage();
-        ev.stopPropagation();
-        ev.preventDefault();
-      }
-    }, true);
-
-    window.addEventListener('keydown', (ev) => this.on_key(ev), { passive: false });
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
         const t = e.target;
@@ -754,26 +695,22 @@ class App {
 
     this.shapes = [];
     this.color_index = 0;
-    this.activeCodeShape = null;
-
-    this.current_shape_coords = [];
-    this.current_shape_color = "black";
-    this.current_base = [0,0];
-
     this.solutionMasks = [];
     this.solutionIndex = 0;
     this.decodeHelpers = null;
-    this.updateSolutionControls();
 
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light') {
-      this.setTheme('light');
-    } else {
-      this.setTheme('dark');
-    }
+    if (savedTheme === 'light') this.setTheme('light'); else this.setTheme('dark');
 
-    this.redraw();
+    const loop = () => {
+        if (this.needsDraw) { this.board.draw(); this.needsDraw = false; }
+        requestAnimationFrame(loop);
+    };
+    loop();
+    this.requestRedraw();
   }
+
+  requestRedraw() { this.needsDraw = true; }
 
   toggleTheme() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -784,7 +721,8 @@ class App {
     document.documentElement.setAttribute('data-theme', themeName);
     localStorage.setItem('theme', themeName);
     document.getElementById('btnTheme').textContent = themeName === 'dark' ? '☀️' : '🌙';
-    this.redraw();
+    if (this.board) this.board.needsGridUpdate = true;
+    this.requestRedraw();
     this.update_shape_list();
   }
 
@@ -793,16 +731,10 @@ class App {
     const H = Math.max(1, Math.min(50, Number(this.inpH.value) || 1));
     this.inpW.value = String(W);
     this.inpH.value = String(H);
-
     this.board.hideMessage();
     this.solutionMasks = []; this.solutionIndex = 0; this.decodeHelpers = null; this.updateSolutionControls();
-    this.current_shape_coords = [];
-
     this.board.setSize(W, H);
-    this.redraw();
-  }
-
-  on_key(event) {
+    this.requestRedraw();
   }
 
   add_shape() {
@@ -811,32 +743,32 @@ class App {
     const cells = Array.from(this.board.filled.keys(), fromKey);
     this.shapes.push(new Shape(cells, color));
     this.board.clear_all();
-    this.current_shape_coords = [];
     this.board.hideMessage();
     this.solutionMasks = []; this.solutionIndex = 0; this.decodeHelpers = null; this.updateSolutionControls();
-    this.redraw();
+    this.requestRedraw();
+    this.update_shape_list();
   }
+
   remove_shape(index) {
     if (index >= 0 && index < this.shapes.length) {
       this.shapes.splice(index, 1);
-      this.redraw();
+      this.update_shape_list();
     }
   }
+
   remove_all_shapes() {
     if (this.shapes.length === 0) return;
     this.shapes = [];
     this.board.clear_all();
-    this.current_shape_coords = [];
-    this.board.hideMessage();
-    this.solutionMasks = []; this.solutionIndex = 0; this.decodeHelpers = null; this.updateSolutionControls();
-    this.redraw();
+    this.update_shape_list();
+    this.requestRedraw();
   }
+
   clear_board() {
     this.board.clear_all();
-    this.current_shape_coords = [];
     this.board.hideMessage();
     this.solutionMasks = []; this.solutionIndex = 0; this.decodeHelpers = null; this.updateSolutionControls();
-    this.redraw();
+    this.requestRedraw();
   }
 
   openCodeModal(shape) {
@@ -845,11 +777,10 @@ class App {
     document.getElementById('codeModal').style.display = 'flex';
   }
 
-refreshCodeModal() {
+  refreshCodeModal() {
     if (!this.activeCodeShape) return;
     const auto = document.getElementById('chkAutoConnect').checked;
     const cellsForGen = this.activeCodeShape.cells.map(([x,y]) => [x, -y]);
-    
     const code = generateCSharp(cellsForGen, auto);
     document.getElementById('codeArea').value = code;
   }
@@ -862,7 +793,6 @@ refreshCodeModal() {
     list.innerHTML = '';
 
     if (countEl) countEl.textContent = String(this.shapes.length);
-
     if (removeAllBtn) removeAllBtn.style.display = this.shapes.length > 0 ? 'inline-block' : 'none';
 
     if (this.shapes.length === 0) {
@@ -874,87 +804,57 @@ refreshCodeModal() {
     this.shapes.forEach((shape, i) => {
       const item = document.createElement('div');
       item.className = 'shapeItem';
-
       const topRow = document.createElement('div');
       topRow.className = 'shapeTop';
       const idxBadge = document.createElement('span');
       idxBadge.className = 'badge indexBadge';
       idxBadge.textContent = `#${i}`;
       topRow.appendChild(idxBadge);
-
       const midRow = document.createElement('div');
       midRow.className = 'shapeMid';
-
       const meta = document.createElement('div');
       meta.className = 'shapeMeta';
       const canvas = document.createElement('canvas');
-      canvas.width = 180; canvas.height = 100;
       shape.drawToCanvas(canvas);
       meta.appendChild(canvas);
-
       const controls = document.createElement('div');
       controls.className = 'midControls';
-
       const btnCode = document.createElement('button');
       btnCode.textContent = 'Get C# Code';
       btnCode.className = 'btn-ghost btn-code';
       btnCode.addEventListener('click', () => this.openCodeModal(shape));
       controls.appendChild(btnCode);
-
       const btn = document.createElement('button');
       btn.textContent = 'Remove';
       btn.className = 'btn-ghost';
       btn.addEventListener('click', () => this.remove_shape(i));
       controls.appendChild(btn);
-
-      midRow.appendChild(meta);
-      midRow.appendChild(controls);
-
+      midRow.appendChild(meta); midRow.appendChild(controls);
       const bottomRow = document.createElement('div');
       bottomRow.className = 'shapeBottom';
-
       const adjRow = document.createElement('div');
       adjRow.className = 'adjRow';
-
       const prismWrap = document.createElement('label');
       prismWrap.className = 'check';
       const prismChk = document.createElement('input');
-      prismChk.type = 'checkbox';
-      prismChk.checked = shape.prism;
+      prismChk.type = 'checkbox'; prismChk.checked = shape.prism;
       prismChk.addEventListener('change', () => { shape.prism = prismChk.checked; });
       const prismTxt = document.createElement('span');
-      prismTxt.textContent = 'Prism';
-      prismTxt.className = 'hint';
-      prismWrap.appendChild(prismTxt);
-      prismWrap.appendChild(prismChk);
+      prismTxt.textContent = 'Prism'; prismTxt.className = 'hint';
+      prismWrap.appendChild(prismTxt); prismWrap.appendChild(prismChk);
       adjRow.appendChild(prismWrap);
-
       const adjLbl = document.createElement('span');
-      adjLbl.className = 'hint';
-      adjLbl.textContent = '        Adjacent to';
+      adjLbl.className = 'hint'; adjLbl.textContent = ' Adj to ';
       const adjInp = document.createElement('input');
-      adjInp.type = 'number';
-      adjInp.min = '0';
-      adjInp.step = '1';
-      adjInp.placeholder = 'idx';
+      adjInp.type = 'number'; adjInp.min = '0'; adjInp.placeholder = 'idx';
       adjInp.value = (Number.isInteger(shape.adjacentTo) ? String(shape.adjacentTo) : '');
       adjInp.addEventListener('input', () => {
         const v = adjInp.value.trim();
-        if (v === '') { shape.adjacentTo = null; return; }
-        const idx = Number(v);
-        if (Number.isInteger(idx) && idx >= 0) {
-          shape.adjacentTo = idx;
-        } else {
-          shape.adjacentTo = null;
-        }
+        shape.adjacentTo = v === '' ? null : Number(v);
       });
-      adjRow.appendChild(adjLbl);
-      adjRow.appendChild(adjInp);
+      adjRow.appendChild(adjLbl); adjRow.appendChild(adjInp);
       bottomRow.appendChild(adjRow);
-
-      item.appendChild(topRow);
-      item.appendChild(midRow);
-      item.appendChild(bottomRow);
+      item.appendChild(topRow); item.appendChild(midRow); item.appendChild(bottomRow);
       list.appendChild(item);
     });
   }
@@ -989,7 +889,7 @@ refreshCodeModal() {
       }
     }
     this.board.filled = placement_map;
-    this.redraw();
+    this.requestRedraw();
     this.updateSolutionControls();
   }
 
@@ -1005,8 +905,7 @@ refreshCodeModal() {
           const [qq, rr] = [q+dq, r+dr];
           const [nx, ny] = axial_to_oddq([qq, rr]);
           if (0 <= nx && nx < W && 0 <= ny && ny < H) {
-            const bi = idx_of(nx, ny);
-            mask |= (1n << BigInt(bi));
+            mask |= (1n << BigInt(idx_of(nx, ny)));
           }
         }
         masks[idx_of(x,y)] = mask;
@@ -1020,18 +919,17 @@ refreshCodeModal() {
     this.board.filled.clear();
     this.solutionMasks = []; this.solutionIndex = 0; this.decodeHelpers = null; this.updateSolutionControls();
 
-    if (this.shapes.length === 0) { this.redraw(); return; }
+    if (this.shapes.length === 0) { this.requestRedraw(); return; }
 
     const W = this.board.width, H = this.board.height;
     const BOARD_CELLS = W * H;
     const total_cells = this.shapes.reduce((s,sh) => s + sh.cells.length, 0);
-    if (total_cells > BOARD_CELLS) { this.redraw(); this.board.drawMessage('No placement available'); return; }
+    if (total_cells > BOARD_CELLS) { this.requestRedraw(); this.board.drawMessage('No placement available'); return; }
 
     const requestedMax = Math.max(1, Math.min(200, Number(document.getElementById('maxSol').value) || 5));
     const MAX_SOLUTIONS = Math.min(requestedMax, 100);
 
     const disableRotation = document.getElementById('disableRotation')?.checked ?? false;
-
     const idx_of = (x,y) => y*W + x;
 
     const powIndex = new Map();
@@ -1045,14 +943,10 @@ refreshCodeModal() {
     const all_shape_placements = [];
     const shape_sizes = [];
     const prism_flags = this.shapes.map(s => !!s.prism);
-
     const adjacentTo = this.shapes.map((s,i) => Number.isInteger(s.adjacentTo) ? s.adjacentTo : -1);
-    const anyAdj = adjacentTo.some(t => t >= 0);
-    const anyPrism = prism_flags.some(Boolean);
 
     for (const shape of this.shapes) {
       const orientations = disableRotation ? [shape.cells] : shape.rotations();
-
       const seenOffsets = new Set();
       const rotationOffsets = [];
       for (const rot of orientations) {
@@ -1060,11 +954,8 @@ refreshCodeModal() {
         const key = offsetsKey(offs);
         if (!seenOffsets.has(key)) { seenOffsets.add(key); rotationOffsets.push(offs); }
       }
-
       let placements = [];
-      const sz = shape.cells.length;
-      shape_sizes.push(sz);
-
+      shape_sizes.push(shape.cells.length);
       for (const offs of rotationOffsets) {
         for (let py=0; py<H; py++) {
           for (let px=0; px<W; px++) {
@@ -1080,10 +971,8 @@ refreshCodeModal() {
           }
         }
       }
-
-      if (placements.length === 0) { this.redraw(); this.board.drawMessage('No placement available'); return; }
-      placements = Array.from(new Set(placements.map(m => m.toString())), s => BigInt(s));
-      all_shape_placements.push(placements);
+      if (placements.length === 0) { this.requestRedraw(); this.board.drawMessage('No placement available'); return; }
+      all_shape_placements.push(Array.from(new Set(placements.map(m => m.toString())), s => BigInt(s)));
     }
 
     const order = [...all_shape_placements.keys()].sort((a,b) => all_shape_placements[a].length - all_shape_placements[b].length);
@@ -1092,23 +981,23 @@ refreshCodeModal() {
     const prism_ordered = order.map(i => prism_flags[i]);
 
     const originalIndexToDepth = new Map(order.map((orig, d) => [orig, d]));
-
     const targetDepthForDepth = new Array(order.length).fill(-1);
     const sourcesForDepth = Array.from({length: order.length}, () => []);
+    
     for (let orig = 0; orig < adjacentTo.length; orig++) {
       const targOrig = adjacentTo[orig];
       if (!(targOrig >= 0) || targOrig === orig || targOrig >= adjacentTo.length) continue;
       const dSrc = originalIndexToDepth.get(orig);
       const dTgt = originalIndexToDepth.get(targOrig);
-      if (dSrc === undefined || dTgt === undefined) continue;
-      targetDepthForDepth[dSrc] = dTgt;
-      sourcesForDepth[dTgt].push(dSrc);
+      if (dSrc !== undefined && dTgt !== undefined) {
+        targetDepthForDepth[dSrc] = dTgt;
+        sourcesForDepth[dTgt].push(dSrc);
+      }
     }
 
     const neighborMasks = this.buildNeighborMasks(W, H);
     const neighborOf = (mask) => {
-      let res = 0n;
-      let m = mask;
+      let res = 0n, m = mask;
       while (m) {
         const lsb = m & (-m);
         const bit = powIndex.get(lsb.toString());
@@ -1118,174 +1007,58 @@ refreshCodeModal() {
       return res;
     };
 
-    const seeds = placements_ordered[0];
-    if (!seeds.length) { this.redraw(); this.board.drawMessage('No placement available'); return; }
-
     const finishWhenReady = (solutions) => {
-      if (!solutions.length) {
-        this.redraw(); this.board.drawMessage('No placement available'); return;
-      }
+      if (!solutions.length) { this.requestRedraw(); this.board.drawMessage('No placement available'); return; }
       this.solutionMasks = solutions;
       this.solutionIndex = 0;
       this.decodeHelpers = { powIndex, indexToCoord, order };
       this.applySolutionByIndex(0);
     };
 
-    if (anyPrism || anyAdj) {
-      const n = placements_ordered.length;
-      const remain = new Array(n + 1).fill(0);
-      for (let i = n - 1; i >= 0; i--) remain[i] = remain[i + 1] + sizes_ordered[i];
+    const n = placements_ordered.length;
+    const remain = new Array(n + 1).fill(0);
+    for (let i = n - 1; i >= 0; i--) remain[i] = remain[i + 1] + sizes_ordered[i];
 
-      const bitCount = (x) => { let c = 0; while (x) { x &= (x - 1n); c++; } return c; };
+    const bitCount = (x) => { let c = 0; while (x) { x &= (x - 1n); c++; } return c; };
+    const solutions = [];
 
-      const solutions = [];
+    const dfs = (depth, occ, chosen, prismUnion, prismPlacedCount) => {
+      if (solutions.length >= MAX_SOLUTIONS) return false;
+      if (remain[depth] > (BOARD_CELLS - bitCount(occ))) return true;
+      if (depth === n) { solutions.push(chosen.slice()); return solutions.length < MAX_SOLUTIONS; }
 
-      const dfs = (depth, occ, chosen, prismUnion, prismPlacedCount) => {
-        if (solutions.length >= MAX_SOLUTIONS) return false;
+      const plist = placements_ordered[depth];
+      const isPrism = prism_ordered[depth];
+      const mustTouchMasksFromSources = sourcesForDepth[depth].filter(s => s < depth).map(s => chosen[s]);
+      const prismBorder = (isPrism && prismPlacedCount > 0) ? neighborOf(prismUnion) : 0n;
 
-        const free = BOARD_CELLS - bitCount(occ);
-        if (remain[depth] > free) return true; // prune
-
-        if (depth === n) {
-          solutions.push(chosen.slice());
-          return solutions.length < MAX_SOLUTIONS;
+      for (let i = 0; i < plist.length; i++) {
+        const mask = plist[i];
+        if ((mask & occ) !== 0n) continue;
+        if (prismBorder !== 0n && (mask & prismBorder) === 0n) continue;
+        let ok = true;
+        for (const srcMask of mustTouchMasksFromSources) {
+          if ((mask & neighborOf(srcMask)) === 0n) { ok = false; break; }
         }
-
-        const plist = placements_ordered[depth];
-        const isPrism = prism_ordered[depth];
-        const mustTouchMasksFromSources = sourcesForDepth[depth]
-          .filter(s => s < depth && chosen[s] !== 0n)
-          .map(s => chosen[s]);
-
-        const needPrismAdjacency = isPrism && prismPlacedCount > 0;
-        const prismBorder = needPrismAdjacency ? neighborOf(prismUnion) : 0n;
-
-        for (let i = 0; i < plist.length; i++) {
-          const mask = plist[i];
-          if ((mask & occ) !== 0n) continue;
-
-          if (needPrismAdjacency && (mask & prismBorder) === 0n) continue;
-          let ok = true;
-          for (const srcMask of mustTouchMasksFromSources) {
-            if ((mask & neighborOf(srcMask)) === 0n) { ok = false; break; }
-          }
-          if (!ok) continue;
-
-          const tDepth = targetDepthForDepth[depth];
-          if (tDepth >= 0 && tDepth < depth) {
-            const tgtMask = chosen[tDepth];
-            if (!tgtMask || (tgtMask & neighborOf(mask)) === 0n) continue;
-          }
-
-          chosen[depth] = mask;
-
-          const nextUnion = isPrism ? (prismUnion | mask) : prismUnion;
-          const nextCount = isPrism ? (prismPlacedCount + 1) : prismPlacedCount;
-
-          if (!dfs(depth + 1, occ | mask, chosen, nextUnion, nextCount)) return false;
+        if (!ok) continue;
+        const tDepth = targetDepthForDepth[depth];
+        if (tDepth >= 0 && tDepth < depth) {
+            if ((chosen[tDepth] & neighborOf(mask)) === 0n) continue;
         }
-        return true;
-      };
-
-      for (let s = 0; s < seeds.length && solutions.length < MAX_SOLUTIONS; s++) {
-        const chosen = new Array(placements_ordered.length).fill(0n);
-        chosen[0] = seeds[s];
-        const firstIsPrism = prism_ordered[0];
-        const firstUnion = firstIsPrism ? seeds[s] : 0n;
-        const firstCount = firstIsPrism ? 1 : 0;
-        if (!dfs(1, seeds[s], chosen, firstUnion, firstCount)) break;
+        chosen[depth] = mask;
+        if (!dfs(depth + 1, occ | mask, chosen, isPrism ? (prismUnion | mask) : prismUnion, isPrism ? (prismPlacedCount + 1) : prismPlacedCount)) return false;
       }
-      finishWhenReady(solutions);
-      return;
-    }
-
-    const haveWorkers = typeof Worker !== 'undefined';
-    const THREADS = Math.min(
-      seeds.length,
-      Math.max(2, Math.min((navigator.hardwareConcurrency || 4), 8))
-    );
-
-    if (!haveWorkers || THREADS <= 1) {
-      const n = placements_ordered.length;
-      const remain = new Array(n + 1).fill(0);
-      for (let i = n - 1; i >= 0; i--) remain[i] = remain[i + 1] + sizes_ordered[i];
-
-      const bitCount = (x) => { let c = 0; while (x) { x &= (x - 1n); c++; } return c; };
-      const solutions = [];
-
-      const dfs = (depth, occ, chosen) => {
-        if (solutions.length >= MAX_SOLUTIONS) return false;
-        const free = BOARD_CELLS - bitCount(occ);
-        if (remain[depth] > free) return true;
-        if (depth === n) { solutions.push(chosen.slice()); return solutions.length < MAX_SOLUTIONS; }
-
-        const plist = placements_ordered[depth];
-        for (let i=0;i<plist.length;i++) {
-          const mask = plist[i];
-          if ((mask & occ) !== 0n) continue;
-          chosen[depth] = mask;
-          if (!dfs(depth + 1, occ | mask, chosen)) return false;
-        }
-        return true;
-      };
-
-      for (let s = 0; s < seeds.length && solutions.length < MAX_SOLUTIONS; s++) {
-        const chosen = new Array(placements_ordered.length).fill(0n);
-        chosen[0] = seeds[s];
-        dfs(1, seeds[s], chosen);
-      }
-      finishWhenReady(solutions);
-      return;
-    }
-
-    const workerURL = createSolverWorkerURL();
-    const workers = [];
-    const chunks = chunk(seeds, THREADS);
-    const perWorkerLimit = Math.max(1, Math.ceil(MAX_SOLUTIONS / chunks.length));
-    let pending = chunks.length;
-    const allSolutions = [];
-
-    const payloadBase = {
-      placements_ordered,
-      sizes_ordered,
-      board_cells: W*H
+      return true;
     };
 
-    const cleanup = () => {
-      workers.forEach(w => { try { w.terminate(); } catch {} });
-      URL.revokeObjectURL(workerURL);
-    };
-
-    chunks.forEach((seedsChunk) => {
-      const w = new Worker(workerURL);
-      workers.push(w);
-      w.onmessage = (ev) => {
-        const { ok, solutions } = ev.data || {};
-        if (ok && Array.isArray(solutions)) {
-          for (const sol of solutions) {
-            if (allSolutions.length < MAX_SOLUTIONS) allSolutions.push(sol);
-          }
-        }
-        pending--;
-        if (pending === 0 || allSolutions.length >= MAX_SOLUTIONS) {
-          cleanup();
-          finishWhenReady(allSolutions);
-        }
-      };
-      w.onerror = () => {
-        pending--;
-        if (pending === 0) { cleanup(); finishWhenReady(allSolutions); }
-      };
-      w.postMessage({ ...payloadBase, seeds: seedsChunk, limit: perWorkerLimit });
-    });
-  }
-
-  redraw() {
-    this.board.draw();
-    this.update_shape_list();
+    for (let s = 0; s < placements_ordered[0].length && solutions.length < MAX_SOLUTIONS; s++) {
+      const chosen = new Array(n).fill(0n);
+      chosen[0] = placements_ordered[0][s];
+      dfs(1, chosen[0], chosen, prism_ordered[0] ? chosen[0] : 0n, prism_ordered[0] ? 1 : 0);
+    }
+    finishWhenReady(solutions);
   }
 }
 const app = new App();
 </script>
 </body></html>
-
