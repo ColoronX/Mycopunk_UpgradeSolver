@@ -82,15 +82,15 @@
   
   main { display: grid; grid-template-columns: 1fr var(--panel-w); min-height: 0; }
  
-	#boardWrap {
-	  position: relative; display: grid; place-items: start center; min-width: 0; min-height: 0; 
-	  overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: auto; padding: 12px; 
-	}
+        #boardWrap {
+          position: relative; display: grid; place-items: start center; min-width: 0; min-height: 0; 
+          overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: auto; padding: 12px; 
+        }
 
-	#board { 
-	  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; 
-	  max-width: 100%; height: auto; display: block; touch-action: manipulation;
-	}
+        #board { 
+          background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; 
+          max-width: 100%; height: auto; display: block; touch-action: manipulation;
+        }
   
   #overlayMessage {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
@@ -256,6 +256,210 @@
   </div>
 
 <script>
+/**
+ * HIGH-PERFORMANCE WORKER SOURCE
+ * Inlined as fallback for grids > 127 cells or when WASM is unavailable.
+ */
+const workerScript = `
+onmessage = function(e) {
+    const { shapeData, requestedMax, n, totalCells, W, H, initialOccupied, neighborLookup } = e.data;
+    let solutions = [];
+
+    const shapeSizes = shapeData.map(s => {
+        let count = 0, m = s.placements[0].mask;
+        while(m > 0n) { m &= (m - 1n); count++; }
+        return count;
+    });
+
+    function countBits(n) {
+        let count = 0;
+        while (n > 0n) { n &= (n - 1n); count++; }
+        return count;
+    }
+
+    function getIslandMask(occupied, startBit) {
+        let island = (1n << BigInt(startBit));
+        let lastIsland = 0n;
+        const fullMask = (1n << BigInt(totalCells)) - 1n;
+        const empty = fullMask & ~occupied;
+        while (island !== lastIsland) {
+            lastIsland = island;
+            let spread = island;
+            let temp = island;
+            while(temp > 0n) {
+                const lsb = temp & -temp;
+                const idx = (lsb.toString(2).length - 1);
+                spread |= neighborLookup[idx];
+                temp ^= lsb;
+            }
+            island = spread & empty;
+        }
+        return island;
+    }
+
+    const solve = (remaining, occupied, prismAdj, currentPlacements, domains) => {
+        if (solutions.length >= requestedMax) return;
+        if (remaining.length === 0) {
+            const sol = new Array(n);
+            for(let r of currentPlacements) sol[r.id] = r.mask;
+            solutions.push(sol);
+            return;
+        }
+
+        // Area Pruning
+        let requiredArea = 0;
+        for(let id of remaining) requiredArea += shapeSizes[id];
+        if (totalCells - countBits(occupied) < requiredArea) return;
+
+        // Island Pruning (Flood Fill check for small holes)
+        if (remaining.length > 0) {
+            const fullMask = (1n << BigInt(totalCells)) - 1n;
+            let unvisited = fullMask & ~occupied;
+            const minShapeSize = Math.min(...remaining.map(id => shapeSizes[id]));
+            while (unvisited > 0n) {
+                const startBit = (unvisited & -unvisited).toString(2).length - 1;
+                const island = getIslandMask(occupied, startBit);
+                if (countBits(island) < minShapeSize) return;
+                unvisited ^= island;
+            }
+        }
+
+        // MRV
+        let bestIdx = -1;
+        let minSize = Infinity;
+        for (let i = 0; i < remaining.length; i++) {
+            const sIdx = remaining[i];
+            const size = domains[sIdx].length;
+            if (size === 0) return;
+            if (size < minSize) { minSize = size; bestIdx = i; if (size === 1) break; }
+        }
+
+        const shapeId = remaining[bestIdx];
+        const nextRemaining = remaining.slice();
+        nextRemaining.splice(bestIdx, 1);
+        const candidates = domains[shapeId];
+        const targetId = shapeData[shapeId].adjTo;
+
+        for (let i = 0; i < candidates.length; i++) {
+            const p = candidates[i];
+            if ((p.mask & occupied) !== 0n) continue;
+            
+            // Adjacency Requirement
+            if (targetId !== -1) {
+                const placedTarget = currentPlacements.find(cp => cp.id === targetId);
+                if (placedTarget && (p.mask & placedTarget.adj) === 0n) continue;
+            }
+            
+            // Prism Requirement
+            if (shapeData[shapeId].prism && prismAdj !== 0n && (p.mask & prismAdj) === 0n) continue;
+
+            // Forward Checking
+            const newOccupied = occupied | p.mask;
+            const newPrismAdj = shapeData[shapeId].prism ? (prismAdj | p.adj) : prismAdj;
+            const newDomains = [];
+            let possible = true;
+
+            for (let j = 0; j < n; j++) {
+                if (j === shapeId || !remaining.includes(j)) { newDomains[j] = null; continue; }
+                const d = domains[j];
+                const filtered = [];
+                const mustTouchId = shapeData[j].adjTo;
+                for (let k = 0; k < d.length; k++) {
+                    const cand = d[k];
+                    if ((cand.mask & newOccupied) !== 0n) continue;
+                    if (mustTouchId === shapeId && (cand.mask & p.adj) === 0n) continue;
+                    filtered.push(cand);
+                }
+                if (filtered.length === 0) { possible = false; break; }
+                newDomains[j] = filtered;
+            }
+
+            if (possible) {
+                currentPlacements.push({ id: shapeId, mask: p.mask, adj: p.adj });
+                solve(nextRemaining, newOccupied, newPrismAdj, currentPlacements, newDomains);
+                currentPlacements.pop();
+                if (solutions.length >= requestedMax) return;
+            }
+        }
+    };
+
+    const initialDomains = shapeData.map(s => s.placements.filter(p => (p.mask & initialOccupied) === 0n));
+    solve(Array.from({length: n}, (_, i) => i), initialOccupied, 0n, [], initialDomains);
+    postMessage({ solutions });
+};
+`;
+
+// ── WASM loader ────────────────────────────────────────────────────────────
+// engine.wasm must be in the same directory as this HTML file.
+let wasmInstance = null;
+
+async function loadWasm() {
+    try {
+        const response = await fetch('engine.wasm');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = await response.arrayBuffer();
+        const result = await WebAssembly.instantiate(bytes);
+        wasmInstance = result.instance.exports;
+        console.log('WASM solver loaded ✓');
+    } catch (e) {
+        console.log('WASM solver unavailable, using JS worker fallback:', e.message);
+    }
+}
+loadWasm();
+
+/**
+ * Call the Rust/WASM solver synchronously.
+ *
+ * Writes shape cell data into the shared buffer, invokes run_solver(),
+ * then reads back solutions as BigInt bitmasks (one per shape per solution).
+ *
+ * Returns an array of solutions, each being an array of BigInt masks
+ * indexed by original shape index — same format as the JS worker output.
+ */
+function callWasm(W, H, shapes, maxSols, disableRotation) {
+    const ptr = wasmInstance.get_buffer_ptr();
+    const mem = wasmInstance.memory.buffer;
+
+    // Write shape data before the call
+    const buf = new Uint8Array(mem, ptr, 65536);
+    let offset = 0;
+    for (let i = 0; i < shapes.length; i++) {
+        const shape = shapes[i];
+        const cells = shape.cells;
+        buf[offset++] = shape.prism ? 1 : 0;
+        const adjTo = (Number.isInteger(shape.adjacentTo) &&
+                       shape.adjacentTo >= 0 &&
+                       shape.adjacentTo < shapes.length)
+            ? shape.adjacentTo : -1;
+        buf[offset++] = adjTo & 0xFF;   // -1 becomes 0xFF which Rust reads as i8(-1)
+        buf[offset++] = shape.noEdge ? 1 : 0;
+        buf[offset++] = cells.length;
+        for (const [col, row] of cells) {
+            buf[offset++] = col;
+            buf[offset++] = row;
+        }
+    }
+
+    wasmInstance.run_solver(W, H, shapes.length, maxSols, disableRotation ? 1 : 0);
+
+    // Read solutions — get a fresh DataView after the call
+    const dv = new DataView(wasmInstance.memory.buffer, ptr);
+    let outOff = 0;
+    const nSols = dv.getUint8(outOff++);
+    const solutions = [];
+    for (let s = 0; s < nSols; s++) {
+        const masks = [];
+        for (let m = 0; m < shapes.length; m++) {
+            const low  = dv.getBigUint64(outOff,     true); outOff += 8;
+            const high = dv.getBigUint64(outOff,     true); outOff += 8;
+            masks.push((high << 64n) | low);
+        }
+        solutions.push(masks);
+    }
+    return solutions;
+}
+
+// ── Colour palette ─────────────────────────────────────────────────────────
 const COLORS = [
   "#e6194b","#3cb44b","#0082c8","#f58231","#911eb4","#46f0f0",
   "#f032e6","#d2f53c","#fabebe","#008080","#e6beff","#aa6e28",
@@ -599,11 +803,11 @@ drawToCanvas(canvas) {
         if (cy < minPY) minPY = cy; if (cy > maxPY) maxPY = cy;
         return [cx, cy];
       });
-	  
+          
       shapeW = (maxPX - minPX) + (2 * currentR);
       shapeH = (maxPY - minPY) + dy;
     };
-	
+        
     calculateLayout(r);
 
     const padding = 8;
@@ -615,7 +819,7 @@ drawToCanvas(canvas) {
       r *= scale;
       calculateLayout(r);
     }
-	
+        
     const offx = (logicalW - shapeW) / 2 - minPX + r;
     const offy = (logicalH - shapeH) / 2 - minPY + (dy / 2);
 
@@ -950,6 +1154,28 @@ buildNeighborMasks(W, H) {
     return masks;
   }
 
+  // ── Shared solution handler used by both WASM and Worker paths ──────────
+  _handleSolutions(solutions, duration, n, W, totalCells) {
+    if (solutions.length === 0) {
+      this.board.drawMessage(`No placement available (${duration}ms)`);
+      this.requestRedraw();
+    } else {
+      const indexToCoord = [];
+      for (let i = 0; i < totalCells; i++) indexToCoord.push([i % W, Math.floor(i / W)]);
+      const powIndex = new Map();
+      for (let i = 0; i < totalCells; i++) powIndex.set((1n << BigInt(i)).toString(), i);
+
+      this.solutionMasks = solutions;
+      this.decodeHelpers = {
+        powIndex,
+        indexToCoord,
+        order: Array.from({ length: n }, (_, i) => i),
+      };
+      this.applySolutionByIndex(0);
+      document.getElementById('solInfo').textContent = `1 / ${solutions.length} (${duration}ms)`;
+    }
+  }
+
 find_placement() {
     const startTime = performance.now();
     this.board.hideMessage();
@@ -963,9 +1189,25 @@ find_placement() {
 
     const W = this.board.width, H = this.board.height;
     const totalCells = W * H;
+    const n = this.shapes.length;
     const requestedMax = Math.max(1, Math.min(200, Number(document.getElementById('maxSol').value) || 5));
     const disableRotation = document.getElementById('disableRotation')?.checked ?? false;
+
+    // ── WASM path: synchronous, fast, supports up to 127 cells ───────────
+    if (wasmInstance && totalCells <= 127) {
+      try {
+        const solutions = callWasm(W, H, this.shapes, requestedMax, disableRotation);
+        const duration = (performance.now() - startTime).toFixed(2);
+        this._handleSolutions(solutions, duration, n, W, totalCells);
+        return;
+      } catch (err) {
+        console.warn('WASM solver error, falling back to JS worker:', err);
+      }
+    }
+
+    // ── JS Web Worker path: fallback for large grids or WASM failure ──────
     const neighborLookup = this.buildNeighborMasks(W, H);
+    
     const getAdjMask = (m) => {
       let adjM = 0n, temp = m;
       while (temp > 0n) {
@@ -1014,91 +1256,28 @@ find_placement() {
         id: idx, 
         placements, 
         prism: !!shape.prism, 
-        adjTo: Number.isInteger(shape.adjacentTo) ? shape.adjacentTo : -1,
-        color: shape.color
+        adjTo: (Number.isInteger(shape.adjacentTo) && shape.adjacentTo >= 0 && shape.adjacentTo < this.shapes.length) ? shape.adjacentTo : -1
       };
     });
 
-    const n = shapeData.length;
-    const solutions = [];
-    const solutionOrder = new Array(n);
-    const solve = (remainingIndices, occupied, prismAdjUnion, placedResults) => {
-      if (solutions.length >= requestedMax) return;
-      if (remainingIndices.length === 0) {
-        const sol = new Array(n);
-        for(let r of placedResults) sol[r.id] = r.mask;
-        solutions.push(sol);
-        return;
-      }
+    const blob = new Blob([workerScript], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+    
+    worker.postMessage({ 
+        shapeData, 
+        requestedMax, 
+        n: shapeData.length, 
+        totalCells, 
+        W, H, 
+        initialOccupied: 0n,
+        neighborLookup: neighborLookup
+    });
 
-      let bestIdxInRemaining = -1;
-      let bestCandidates = null;
-      let minCount = Infinity;
-
-      for (let i = 0; i < remainingIndices.length; i++) {
-        const sIdx = remainingIndices[i];
-        const shape = shapeData[sIdx];
-        const mustTouch = (shape.adjTo !== -1) ? 
-            placedResults.find(r => r.id === shape.adjTo)?.adj : 0n;
-        
-        const candidates = [];
-        for (let p of shape.placements) {
-          if ((p.mask & occupied) !== 0n) continue;
-          if (mustTouch && (p.mask & mustTouch) === 0n) continue;
-          if (shape.prism && prismAdjUnion !== 0n && (p.mask & prismAdjUnion) === 0n) continue;
-          candidates.push(p);
-        }
-
-        const count = candidates.length;
-        if (count === 0) return;
-
-        if (count < minCount) {
-          minCount = count;
-          bestIdxInRemaining = i;
-          bestCandidates = candidates;
-          if (count === 1) break;
-        }
-      }
-
-      const shapeId = remainingIndices[bestIdxInRemaining];
-      const nextRemaining = remainingIndices.filter((_, i) => i !== bestIdxInRemaining);
-      const isPrism = shapeData[shapeId].prism;
-
-      for (let p of bestCandidates) {
-        placedResults.push({ id: shapeId, mask: p.mask, adj: p.adj });
-        
-        solve(
-          nextRemaining, 
-          occupied | p.mask, 
-          isPrism ? (prismAdjUnion | p.adj) : prismAdjUnion,
-          placedResults
-        );
-
-        placedResults.pop();
-        if (solutions.length >= requestedMax) return;
-      }
+    worker.onmessage = (e) => {
+        const duration = (performance.now() - startTime).toFixed(2);
+        this._handleSolutions(e.data.solutions, duration, n, W, totalCells);
+        worker.terminate();
     };
-
-    const initialIndices = shapeData.map((_, i) => i);
-    solve(initialIndices, 0n, 0n, []);
-
-    const duration = (performance.now() - startTime).toFixed(2);
-    console.log(`[Solver] Finished in ${duration}ms`);
-
-    if (solutions.length === 0) {
-      this.board.drawMessage(`No placement available (${duration}ms)`);
-      this.requestRedraw();
-    } else {
-      const indexToCoord = [];
-      for(let i=0; i<totalCells; i++) indexToCoord.push([i % W, Math.floor(i / W)]);
-      const powIndex = new Map();
-      for(let i=0; i<totalCells; i++) powIndex.set((1n << BigInt(i)).toString(), i);
-
-      this.solutionMasks = solutions; 
-      this.decodeHelpers = { powIndex, indexToCoord, order: Array.from({length: n}, (_, i) => i) };
-      this.applySolutionByIndex(0);
-      document.getElementById('solInfo').textContent = `1 / ${solutions.length} (${duration}ms)`;
-    }
   }
  }
 const app = new App();
