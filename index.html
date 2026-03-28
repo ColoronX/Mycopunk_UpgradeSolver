@@ -202,6 +202,11 @@
       <span class="hint">No Rotation</span>
       <input type="checkbox" id="disableRotation">
     </label>
+	
+  <label class="check" title="Force JS Worker instead of WASM">
+    <span class="hint">Legacy Solver</span>
+    <input type="checkbox" id="chkLegacy">
+  </label>
 
     <div class="sizeControls">
       <span class="hint">Board</span>
@@ -1192,9 +1197,10 @@ find_placement() {
     const n = this.shapes.length;
     const requestedMax = Math.max(1, Math.min(200, Number(document.getElementById('maxSol').value) || 5));
     const disableRotation = document.getElementById('disableRotation')?.checked ?? false;
+    const useLegacy = document.getElementById('chkLegacy')?.checked ?? false;
 
-    // ── WASM path: synchronous, fast, supports up to 127 cells ───────────
-    if (wasmInstance && totalCells <= 127) {
+    // Only use WASM if it's loaded, cells are <= 127, AND "Legacy" is NOT checked
+    if (wasmInstance && totalCells <= 127 && !useLegacy) {
       try {
         const solutions = callWasm(W, H, this.shapes, requestedMax, disableRotation);
         const duration = (performance.now() - startTime).toFixed(2);
@@ -1204,6 +1210,7 @@ find_placement() {
         console.warn('WASM solver error, falling back to JS worker:', err);
       }
     }
+    
 
     // ── JS Web Worker path: fallback for large grids or WASM failure ──────
     const neighborLookup = this.buildNeighborMasks(W, H);
