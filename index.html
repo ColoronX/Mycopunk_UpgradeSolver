@@ -544,7 +544,7 @@ function normalizeForExport(cells) {
     if (newMinY < 0) { norm.forEach(c => c[1] -= newMinY); } else if (newMinY > 0) { norm.forEach(c => c[1] -= newMinY); }
     return norm;
 }
-
+	
 function generateCSharp(cells, autoConnect) {
     const norm = normalizeForExport(cells);
     const map = new Map();
@@ -561,25 +561,38 @@ function generateCSharp(cells, autoConnect) {
         return a.x < b.x;
     };
     let w = 0, h = 0;
-    norm.forEach(([x,y]) => { w = Math.max(w, x); h = Math.max(h, y); });
-    w = Math.max(3, w + 1); h = Math.max(3, h + 1);
-    norm.sort((a,b) => a[0] - b[0] || a[1] - b[1]);
-    let sb = `protected override HexMap Pattern\n{\n\tget\n\t{\n\t\tHexMap m = new HexMap(${w}, ${h});\n`;
+    norm.forEach(([x,y]) => { 
+        w = Math.max(w, x); 
+        h = Math.max(h, y); 
+    });
+      w = Math.max(3, w + 1); 
+	  h = Math.max(3, h + 1);
+       norm.sort((a,b) => a[0] - b[0] || a[1] - b[1]);
+    let sb = `private static void ApplyCustomPattern(Upgrade upgrade)\n`;
+    sb += `{\n`;
+    sb += `    if (upgrade == null) return;\n\n`;
+    sb += `    HexMap m = new HexMap(${w}, ${h});\n`;
     norm.forEach(([x,y]) => {
-        sb += `\t\tm[${x}, ${y}].enabled = true;`;
+        sb += `    m[${x}, ${y}].enabled = true;`;
         if (autoConnect) {
             const me = map.get(`${x},${y}`);
             const isEven = (x % 2 === 0);
             const flags = [];
+            
             getNeighborOffsets(isEven).forEach(o => {
                 const nKey = `${x + o.dx},${y + o.dy}`;
-                if (map.has(nKey) && hasPriority(me, map.get(nKey))) { flags.push(`HexMap.Direction.${o.name}`); }
+                if (map.has(nKey) && hasPriority(me, map.get(nKey))) { 
+                    flags.push(`HexMap.Direction.${o.name}`); 
+                }
             });
-            if (flags.length) sb += ` m[${x}, ${y}].connections = ${flags.join(" | ")};`;
+            if (flags.length) {
+                sb += ` m[${x}, ${y}].connections = ${flags.join(" | ")};`;
+            }
         }
         sb += `\n`;
     });
-    sb += `\t\treturn m;\n\t}\n}`;
+    sb += `\n    SetPrivateField(upgrade, "pattern", m);\n`;
+    sb += `}`;
     return sb;
 }
   
