@@ -455,9 +455,11 @@ function callWasm(W, H, shapes, maxSols, disableRotation) {
     for (let s = 0; s < nSols; s++) {
         const masks = [];
         for (let m = 0; m < shapes.length; m++) {
-            const low  = dv.getBigUint64(outOff,     true); outOff += 8;
-            const high = dv.getBigUint64(outOff,     true); outOff += 8;
-            masks.push((high << 64n) | low);
+            const w0 = dv.getBigUint64(outOff, true); outOff += 8;
+            const w1 = dv.getBigUint64(outOff, true); outOff += 8;
+            const w2 = dv.getBigUint64(outOff, true); outOff += 8;
+            const w3 = dv.getBigUint64(outOff, true); outOff += 8;
+            masks.push((w3 << 192n) | (w2 << 128n) | (w1 << 64n) | w0);
         }
         solutions.push(masks);
     }
@@ -1212,8 +1214,8 @@ find_placement() {
     const disableRotation = document.getElementById('disableRotation')?.checked ?? false;
     const useLegacy = document.getElementById('chkLegacy')?.checked ?? false;
 
-    // Only use WASM if it's loaded, cells are <= 127, AND "Legacy" is NOT checked
-    if (wasmInstance && totalCells <= 127 && !useLegacy) {
+    // Only use WASM if it's loaded, supports this grid size, and Legacy is not checked.
+    if (wasmInstance && !useLegacy && wasmInstance.check_supported(W, H) === 1) {
       try {
         const solutions = callWasm(W, H, this.shapes, requestedMax, disableRotation);
         const duration = (performance.now() - startTime).toFixed(2);
