@@ -110,6 +110,7 @@
     transition: border-color 0.15s; outline: none;
     -moz-appearance: textfield;
     padding: 8px;
+	text-align: center;
   }
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
@@ -255,7 +256,7 @@
 	
     <label class="check" title="Force JS Worker instead of WASM">
       <input type="checkbox" id="chkLegacy">
-      <span class="hint">Legacy Solver</span>
+      <span class="hint">Legacy</span>
     </label>
 
     <div class="divider"></div>
@@ -323,9 +324,6 @@
   </div>
 
 <script>
-/**
- * COMBINED WASM / JS SOLVER WORKER SOURCE
- */
 const workerScript = `
 onmessage = async function(e) {
     if (e.data.type === 'solve') {
