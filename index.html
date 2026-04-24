@@ -32,7 +32,7 @@
     --border-input: #cbd5e1;
     --border-hover: #94a3b8;
     
-    --stroke: #7a4a2e;
+    --stroke: #64748b;
     
     --hex-empty: #ffffff;
     --hex-fill: #333333;
@@ -77,6 +77,99 @@
 
 	--shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 	--shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  [data-theme="github"] {
+    --bg-body: #010409;
+    --bg-panel: #0d1117;
+    --bg-input: #151b23;
+    --bg-hover: #262c36;
+    --bg-code: #010409;
+    
+    --fg-primary: #e6edf3;
+    --fg-secondary: #9198a1;
+    --fg-badge: #e6edf3;
+
+    --border: #30363d;
+    --border-input: #262c36;
+    --border-hover: #8b949e;
+    
+    --danger: #f85149;
+    --danger-hover: #ff7b72;
+    
+    --stroke: #8b949e;
+    
+    --hex-empty: #151b23;
+    --hex-fill: #3a4a7a;
+    
+    --overlay-bg: rgba(1, 4, 9, 0.6);
+    --kbd-bg: rgba(110, 118, 129, 0.4);
+    --badge-bg: rgba(110, 118, 129, 0.4);
+
+    --shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+[data-theme="pastel"] {
+    --bg-body: #262c25;
+    --bg-panel: #343c32;
+    --bg-input: #262c25;
+    --bg-hover: #424d40;
+    --bg-code: #1d221c;
+    
+    --fg-primary: #F1F3E0;
+    --fg-secondary: #A1BC98;
+    --fg-badge: #F1F3E0;
+
+    --border: #525e4f;
+    --border-input: #525e4f;
+    --border-hover: #778873;
+    
+    --danger: #ef5350;
+    --danger-hover: #e53935;
+    
+    --stroke: #778873;
+    
+    --hex-empty: #343c32;
+    --hex-fill: #D2DCB6;
+    
+    --overlay-bg: rgba(38, 44, 37, 0.75);
+    --kbd-bg: rgba(119, 136, 115, 0.25);
+    --badge-bg: rgba(119, 136, 115, 0.25);
+
+    --shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  [data-theme="darksand"] {
+    --bg-body: #222831;
+    --bg-panel: #393E46;
+    --bg-input: #222831;
+    --bg-hover: #454b54;
+    --bg-code: #1a1e25;
+    
+    --fg-primary: #DFD0B8;
+    --fg-secondary: #948979;
+    --fg-badge: #DFD0B8;
+
+    --border: #4a5059;
+    --border-input: #4a5059;
+    --border-hover: #948979;
+    
+    --danger: #ef4444;
+    --danger-hover: #dc2626;
+    
+    --stroke: #948979;
+    
+    --hex-empty: #393E46;
+    --hex-fill: #DFD0B8;
+    
+    --overlay-bg: rgba(34, 40, 49, 0.7);
+    --kbd-bg: rgba(148, 137, 121, 0.2);
+    --badge-bg: rgba(148, 137, 121, 0.2);
+
+    --shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -1144,9 +1237,13 @@ class App {
 
   requestRedraw() { this.needsDraw = true; }
 
-  toggleTheme() {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    this.setTheme(isDark ? 'light' : 'dark');
+toggleTheme() {
+    const themes = ['dark', 'darksand', 'pastel', 'light', 'github'];
+    let current = document.documentElement.getAttribute('data-theme');
+    if (!themes.includes(current)) current = 'dark';
+
+    const nextIndex = (themes.indexOf(current) + 1) % themes.length;
+    this.setTheme(themes[nextIndex]);
   }
 
   setTheme(themeName) {
@@ -1154,13 +1251,18 @@ class App {
     localStorage.setItem('theme', themeName);
     const themeIcon = document.querySelector('#btnTheme .material-symbols-outlined');
     if (themeIcon) {
-        themeIcon.textContent = themeName === 'dark' ? 'light_mode' : 'dark_mode';
+
+        if (themeName === 'dark') themeIcon.textContent = 'landscape';
+        else if (themeName === 'darksand') themeIcon.textContent = 'palette';
+        else if (themeName === 'pastel') themeIcon.textContent = 'light_mode';
+        else if (themeName === 'light') themeIcon.textContent = 'code';
+        else if (themeName === 'github') themeIcon.textContent = 'dark_mode';
     }
     if (this.board) this.board.needsGridUpdate = true;
     this.requestRedraw();
     this.update_shape_list();
   }
-
+  
   applySize() {
     this.cancel_solve();
     const W = Math.max(1, Math.min(50, Number(this.inpW.value) || 1));
