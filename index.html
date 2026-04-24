@@ -325,19 +325,87 @@
 
 <script>
 const workerScript = `
+const toKey = (x,y) => \`\${x},\${y}\`;
+const fromKey = k => k.split(',').map(Number);
+const cmpCoord = (a,b) => a[0] - b[0] || a[1] - b[1];
+const cloneCells = cells => cells.map(([x,y]) => [x,y]);
+function canonicalKey(cells) { const arr = cells.map(([x,y]) => \`\${x},\${y}\`); arr.sort(); return arr.join(';'); }
+
+function oddq_to_axial([col,row]) {
+  const parity = (col % 2 === 0) ? 0 : 1;
+  const q = col;
+  const r = row - Math.floor((col + parity)/2);
+  return [q, r];
+}
+function axial_to_oddq([q,r]) {
+  const parity = (q % 2 === 0) ? 0 : 1;
+  const col = q;
+  const row = r + Math.floor((q + parity)/2);
+  return [col, row];
+}
+function axial_to_cube([x,y]) { return [x, y, -x - y]; }
+function cube_to_axial(x,y,z) { return [x,y]; }
+function oddq_to_cube(coord) { return axial_to_cube(oddq_to_axial(coord)); }
+function cube_to_oddq(x,y,z) { return axial_to_oddq(cube_to_axial(x,y,z)); }
+function _cube_rotate_steps(x,y,z,steps) {
+  let s = ((steps % 6) + 6) % 6;
+  for (let i=0;i<s;i++) [x,y,z] = [-z, -x, -y];
+  return [x,y,z];
+}
+
+function get_pivot(cells) {
+  return cells.reduce((best, cur) => {
+    if (!best) return cur;
+    if (cur[0] < best[0]) return cur;
+    if (cur[0] === best[0] && cur[1] < best[1]) return cur;
+    return best;
+  }, null);
+}
+
+function rotate_cells_about_pivot_oddq(cells, times) {
+  if (!cells || !cells.length) return [];
+  let s = ((times % 6) + 6) % 6;
+  if (s === 0) return cloneCells(cells);
+  const pivot = get_pivot(cells);
+  const [pcx,pcy,pcz] = oddq_to_cube(pivot);
+  const out = new Set();
+  for (const [col,row] of cells) {
+    let [cx,cy,cz] = oddq_to_cube([col,row]);
+    cx -= pcx; cy -= pcy; cz -= pcz;
+    [cx,cy,cz] = _cube_rotate_steps(cx,cy,cz,s);
+    cx += pcx; cy += pcy; cz += pcz;
+    const [nx,ny] = cube_to_oddq(cx,cy,cz);
+    out.add(toKey(nx,ny));
+  }
+  return Array.from(out, fromKey).sort(cmpCoord);
+}
+
+function offsetsFromPivotAxial(cells) {
+  const pivot = get_pivot(cells);
+  const [pq, pr] = oddq_to_axial(pivot);
+  const offs = [];
+  for (const c of cells) {
+    const [q, r] = oddq_to_axial(c);
+    offs.push([q - pq, r - pr]);
+  }
+  offs.sort((a,b) => a[0] - b[0] || a[1] - b[1]);
+  return offs;
+}
+function offsetsKey(offs) { return offs.map(([dq,dr]) => dq + "," + dr).join(";"); }
+
 onmessage = async function(e) {
     if (e.data.type === 'solve') {
-        const { useLegacy, wasmBytes, shapes, maxSols, disableRotation, W, H, totalCells, shapeData, neighborLookup, requestedMax, n } = e.data;
+        const { useLegacy, wasmModule, shapes, maxSols, disableRotation, W, H, totalCells, neighborLookup, requestedMax, n } = e.data;
         let solutions = [];
         
-        if (wasmBytes && !useLegacy) {
+        if (wasmModule && !useLegacy) {
             try {
-                const result = await WebAssembly.instantiate(wasmBytes);
-                const wasmInstance = result.instance.exports;
+                const wasmInstance = await WebAssembly.instantiate(wasmModule);
+                const exports = wasmInstance.exports || wasmInstance;
                 
-                if (!wasmInstance.check_supported || wasmInstance.check_supported(W, H) === 1) {
-                    const ptr = wasmInstance.get_buffer_ptr();
-                    const mem = wasmInstance.memory.buffer;
+                if (!exports.check_supported || exports.check_supported(W, H) === 1) {
+                    const ptr = exports.get_buffer_ptr();
+                    const mem = exports.memory.buffer;
                     const buf = new Uint8Array(mem, ptr, 65536);
                     let offset = 0;
                     
@@ -355,9 +423,9 @@ onmessage = async function(e) {
                         }
                     }
 
-                    wasmInstance.run_solver(W, H, shapes.length, maxSols, disableRotation ? 1 : 0);
+                    exports.run_solver(W, H, shapes.length, maxSols, disableRotation ? 1 : 0);
 
-                    const dv = new DataView(wasmInstance.memory.buffer, ptr);
+                    const dv = new DataView(exports.memory.buffer, ptr);
                     let outOff = 0;
                     const nSols = dv.getUint8(outOff++);
                     for (let s = 0; s < nSols; s++) {
@@ -378,6 +446,69 @@ onmessage = async function(e) {
                 console.warn('WASM solver error, falling back to JS worker:', err);
             }
         }
+
+        const getAdjMask = (m) => {
+            let adjM = 0n, temp = m;
+            while (temp > 0n) {
+                const lsb = temp & -temp;
+                const bitIdx = lsb.toString(2).length - 1; 
+                adjM |= neighborLookup[bitIdx];
+                temp ^= lsb;
+            }
+            return adjM;
+        };
+
+        const forbiddenMask = (() => {
+            let m = 0n;
+            for (let i = 0; i < totalCells; i++) {
+                const x = i % W, y = Math.floor(i / W);
+                if (x === W - 1 || y === 0) m |= (1n << BigInt(i));
+            }
+            return m;
+        })();
+
+        let shapeData = shapes.map((shape, idx) => {
+            const rotations = () => {
+                const res = [];
+                const seen = new Set();
+                for (let i=0;i<6;i++) {
+                    const rot = rotate_cells_about_pivot_oddq(shape.cells, i);
+                    const key = canonicalKey(rot);
+                    if (!seen.has(key)) { seen.add(key); res.push(rot); }
+                }
+                return res;
+            };
+
+            const orientations = disableRotation ? [shape.cells] : rotations();
+            const placements = [];
+            const seen = new Set();
+            for (const rot of orientations) {
+                const offs = offsetsFromPivotAxial(rot);
+                const key = offsetsKey(offs);
+                if (seen.has(key)) continue;
+                seen.add(key);
+                for (let py = 0; py < H; py++) {
+                    for (let px = 0; px < W; px++) {
+                        const [pq, pr] = oddq_to_axial([px, py]);
+                        let m = 0n, ok = true;
+                        for (const [dq, dr] of offs) {
+                            const [cx, cy] = axial_to_oddq([pq + dq, pr + dr]);
+                            if (cx >= 0 && cx < W && cy >= 0 && cy < H) m |= (1n << BigInt(cy * W + cx));
+                            else { ok = false; break; }
+                        }
+                        if (ok && (!shape.noEdge || (m & forbiddenMask) === 0n)) {
+                            placements.push({ mask: m, adj: getAdjMask(m) });
+                        }
+                    }
+                }
+            }
+            return { 
+                id: idx, 
+                placements, 
+                prism: !!shape.prism, 
+                adjTo: (Number.isInteger(shape.adjacentTo) && shape.adjacentTo >= 0 && shape.adjacentTo < shapes.length) ? shape.adjacentTo : -1
+            };
+        });
 
         const shapeSizes = shapeData.map(s => {
             if (!s.placements.length) return 0;
@@ -499,13 +630,14 @@ onmessage = async function(e) {
 };
 `;
 
-let wasmBytes = null;
+let wasmModule = null;
 async function fetchWasm() {
     try {
         const response = await fetch('engine.wasm');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        wasmBytes = await response.arrayBuffer();
-        console.log('WASM solver bytes loaded ✓');
+        const bytes = await response.arrayBuffer();
+        wasmModule = await WebAssembly.compile(bytes);
+        console.log('WASM solver module compiled ✓');
     } catch (e) {
         console.log('WASM solver unavailable, will fallback to JS worker:', e.message);
     }
@@ -833,7 +965,7 @@ class Shape {
     this.adjacentTo = null;
   }
 
-drawToCanvas(canvas) {
+  drawToCanvas(canvas) {
     const dpr = (window.devicePixelRatio || 1) < 4 ? 4 : (window.devicePixelRatio || 1);
     const logicalW = 180;
     const logicalH = 100;
@@ -1333,58 +1465,6 @@ class App {
     const useLegacy = document.getElementById('chkLegacy')?.checked ?? false;
 
     const neighborLookup = this.buildNeighborMasks(W, H);
-    
-    const getAdjMask = (m) => {
-      let adjM = 0n, temp = m;
-      while (temp > 0n) {
-        const lsb = temp & -temp;
-        const bitIdx = lsb.toString(2).length - 1; 
-        adjM |= neighborLookup[bitIdx];
-        temp ^= lsb;
-      }
-      return adjM;
-    };
-
-    const forbiddenMask = (() => {
-      let m = 0n;
-      for (let i = 0; i < totalCells; i++) {
-        const x = i % W, y = Math.floor(i / W);
-        if (x === W - 1 || y === 0) m |= (1n << BigInt(i));
-      }
-      return m;
-    })();
-
-    let shapeData = this.shapes.map((shape, idx) => {
-      const orientations = disableRotation ? [shape.cells] : shape.rotations();
-      const placements = [];
-      const seen = new Set();
-      for (const rot of orientations) {
-        const offs = offsetsFromPivotAxial(rot);
-        const key = offsetsKey(offs);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        for (let py = 0; py < H; py++) {
-          for (let px = 0; px < W; px++) {
-            const [pq, pr] = oddq_to_axial([px, py]);
-            let m = 0n, ok = true;
-            for (const [dq, dr] of offs) {
-              const [cx, cy] = axial_to_oddq([pq + dq, pr + dr]);
-              if (cx >= 0 && cx < W && cy >= 0 && cy < H) m |= (1n << BigInt(cy * W + cx));
-              else { ok = false; break; }
-            }
-            if (ok && (!shape.noEdge || (m & forbiddenMask) === 0n)) {
-              placements.push({ mask: m, adj: getAdjMask(m) });
-            }
-          }
-        }
-      }
-      return { 
-        id: idx, 
-        placements, 
-        prism: !!shape.prism, 
-        adjTo: (Number.isInteger(shape.adjacentTo) && shape.adjacentTo >= 0 && shape.adjacentTo < this.shapes.length) ? shape.adjacentTo : -1
-      };
-    });
 
     const blob = new Blob([workerScript], { type: 'application/javascript' });
     this.solveWorker = new Worker(URL.createObjectURL(blob));
@@ -1392,7 +1472,7 @@ class App {
     this.solveWorker.postMessage({
         type: 'solve',
         useLegacy,
-        wasmBytes,
+        wasmModule,
         shapes: this.shapes.map(s => ({
             cells: s.cells,
             prism: s.prism,
@@ -1402,7 +1482,6 @@ class App {
         maxSols: requestedMax,
         disableRotation,
         W, H, totalCells,
-        shapeData, 
         neighborLookup,
         requestedMax,
         n
