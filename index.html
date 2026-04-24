@@ -9,221 +9,281 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Mycopunk Upgrade Solver & Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
 <style>
   :root { 
-    --bg-body: #fafafa;
+    --bg-body: #f8fafc;
     --bg-panel: #ffffff;
-    --bg-input: #ffffff;
-    --bg-hover: #f3f3f3;
+    --bg-input: #f1f5f9;
+    --bg-hover: #f1f5f9;
     --bg-code: #1e1e1e;
     
-    --fg-primary: #222222;
-    --fg-secondary: #555555;
-    --fg-badge: #444444;
+    --fg-primary: #0f172a;
+    --fg-secondary: #64748b;
+    --fg-badge: #334155;
+
+    --danger: #ef4444;
+    --danger-hover: #dc2626;
     
-    --border: #dddddd;
-    --border-input: #cccccc;
-    --border-hover: #aaaaaa;
+    --border: #e2e8f0;
+    --border-input: #cbd5e1;
+    --border-hover: #94a3b8;
     
     --stroke: #7a4a2e;
     
     --hex-empty: #ffffff;
     --hex-fill: #333333;
-    
-    --overlay-bg: rgba(255,255,255,0.7);
-    --kbd-bg: #f1f5f9;
-    --badge-bg: #f7f7f8;
-    
-    --panel-w: 380px; 
+
+	--overlay-bg: rgba(0, 0, 0, 0.35);   
+	--kbd-bg: rgba(148, 163, 184, 0.15); 
+	--badge-bg: rgba(148, 163, 184, 0.2);
+
+    --panel-w: 400px; 
+    --radius: 8px;
+    --radius-sm: 6px;
+	--shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+	--shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
   }
 
   [data-theme="dark"] {
     --bg-body: #121212;
     --bg-panel: #1e1e1e;
-    --bg-input: #2c2c2c;
+    --bg-input: #1e1e1e;
     --bg-hover: #383838;
     --bg-code: #000000;
     
     --fg-primary: #e0e0e0;
     --fg-secondary: #aaaaaa;
     --fg-badge: #e0e0e0;
-    
+
     --border: #333333;
     --border-input: #444444;
     --border-hover: #666666;
+	
+	--danger: #ef4444;
+    --danger-hover: #dc2626;
     
     --stroke: #a67c52;
     
     --hex-empty: #2a2a2a;
     --hex-fill: #e9bb38;
-    
-    --overlay-bg: rgba(0,0,0,0.7);
-    --kbd-bg: #333333;
-    --badge-bg: #333333;
+	
+	--overlay-bg: rgba(0, 0, 0, 0.35);
+	--kbd-bg: rgba(148, 163, 184, 0.15);
+	--badge-bg: rgba(148, 163, 184, 0.2);
+
+	--shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+	--shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
-    margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    margin: 0; font-family: 'Inter', system-ui, sans-serif; font-size: 14px;
     color: var(--fg-primary); background: var(--bg-body);
     height: 100vh; display: grid; grid-template-rows: auto 1fr;
     transition: background 0.2s, color 0.2s;
   }
-  header {
-    padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    border-bottom: 1px solid var(--border); background: var(--bg-panel);
-  }
-  button {
-    padding: 8px 12px; border: 1px solid var(--border-input); border-radius: 8px; 
-    background: var(--bg-input); color: var(--fg-primary); cursor: pointer;
-    white-space: nowrap;
-  }
-  button:hover { border-color: var(--border-hover); background: var(--bg-hover); }
   
+  /* Form Elements */
+  button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 14px; border: 1px solid var(--border-input); border-radius: var(--radius); 
+    background: var(--bg-panel); color: var(--fg-primary); cursor: pointer;
+    white-space: nowrap; font-family: inherit; font-size: 13px; font-weight: 500;
+    transition: all 0.15s ease; box-shadow: var(--shadow-sm);
+  }
+  button:hover:not(:disabled) { border-color: var(--border-hover); background: var(--bg-hover); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+  
+  #btnCancel { display: none; color: white; border-color: var(--danger); background: var(--danger); }
+  #btnCancel:hover { background: var(--danger-hover); border-color: var(--danger-hover); }
+
+  .material-symbols-outlined { font-size: 18px; font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20; }
+  
+  input[type="number"] {
+    font-family: inherit; font-size: 13px;
+    border: 1px solid var(--border-input); border-radius: var(--radius);
+    background: var(--bg-input); color: var(--fg-primary);
+    transition: border-color 0.15s; outline: none;
+    -moz-appearance: textfield;
+    padding: 8px;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"]:focus { border-color: var(--border-hover); }
+
+  /* Layout */
+  header {
+    padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); background: var(--bg-panel); box-shadow: var(--shadow-sm);
+    z-index: 10; position: relative;
+  }
   main { display: grid; grid-template-columns: 1fr var(--panel-w); min-height: 0; }
  
-        #boardWrap {
-          position: relative; display: grid; place-items: start center; min-width: 0; min-height: 0; 
-          overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: auto; padding: 12px; 
-        }
+  #boardWrap {
+    position: relative; display: grid; place-items: start center; min-width: 0; min-height: 0; 
+    overflow: auto; padding: 20px; 
+  }
+  #boardWrap::-webkit-scrollbar, #shapeList::-webkit-scrollbar, #codeArea::-webkit-scrollbar { width: 8px; height: 8px; }
+  #boardWrap::-webkit-scrollbar-track, #shapeList::-webkit-scrollbar-track, #codeArea::-webkit-scrollbar-track { background: transparent; }
+  #boardWrap::-webkit-scrollbar-thumb, #shapeList::-webkit-scrollbar-thumb, #codeArea::-webkit-scrollbar-thumb { background: var(--border-input); border-radius: 4px; }
 
-        #board { 
-          background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; 
-          max-width: 100%; height: auto; display: block; touch-action: manipulation;
-        }
+  #board { 
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; 
+    max-width: 100%; height: auto; display: block; touch-action: manipulation; box-shadow: var(--shadow);
+  }
   
   #overlayMessage {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
-    font-size: 20px; font-weight: 600; color: #ff5555; background: var(--overlay-bg);
-    pointer-events: auto; z-index: 100;
+    font-size: 18px; font-weight: 500; color: var(--danger); background: var(--overlay-bg);
+    pointer-events: auto; z-index: 100; backdrop-filter: blur(2px);
   }
   
   aside {
     border-left: 1px solid var(--border); background: var(--bg-panel); min-width: 0;
     display: grid; grid-template-rows: auto auto 1fr;
-    min-height: 0; 
+    min-height: 0; box-shadow: -4px 0 15px -3px rgba(0,0,0,0.05);
   }
   .sideHeader {
-    padding: 10px 12px; border-bottom: 1px solid var(--border); font-weight: 600;
-    display:flex; align-items:center; gap:8px;
+    padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600;
+    display:flex; align-items:center; gap:8px; font-size: 15px;
   }
-  #shapeList { overflow: auto; padding: 10px; display: grid; gap: 10px; min-height: 0; }
+  #shapeList { overflow: auto; padding: 16px; display: grid; gap: 12px; min-height: 0; }
 
   .shapeItem {
-    display: grid;
-    grid-template-rows: auto auto auto; 
-    grid-template-columns: 1fr;
-    gap: 6px;
-    padding: 8px; border: 1px solid var(--border); border-radius: 10px;
-    background: var(--bg-body);
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 12px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-body); box-shadow: var(--shadow-sm);
   }
-  .shapeTop { display:flex; align-items:center; justify-content:flex-start; }
-  .shapeMid { display:grid; grid-template-columns: 1fr auto; align-items:center; gap:10px; }
-  .shapeBottom { display:flex; align-items:center; justify-content:flex-start; }
-  .shapeMeta { display:flex; align-items:center; gap:10px; } 
-  .midControls { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+  .shapeTop { display:flex; align-items:center; justify-content:space-between; }
+  .shapeMid { display:grid; grid-template-columns: 1fr; align-items:center; gap:10px; }
+  .shapeBottom { display:flex; align-items:center; gap:8px; flex-wrap: wrap; }
+  
+  .shapeMeta { display:flex; justify-content:center; background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px;} 
+  .midControls { display:flex; gap:8px; justify-content: space-between; }
 
-  .shapeItem canvas { 
-    background: var(--bg-panel); 
-    border: 1px dashed var(--border); 
-    border-radius: 8px; 
-  }
-  .shapeItem button { padding: 6px 8px; }
-  .hint { opacity: 0.8; font-size: 12px; color: var(--fg-secondary); }
+  .shapeItem canvas { border-radius: 4px; max-width: 100%; }
+  .hint { opacity: 0.8; font-size: 12px; color: var(--fg-secondary); font-weight: 500; vertical-align: middle; }
   .grow { flex: 1 1 auto; }
   
   .solControls { display:flex; align-items:center; gap:8px; }
-  .solControls input[type="number"] { width: 72px; padding:6px 8px; border:1px solid var(--border-input); border-radius:8px; background: var(--bg-input); color: var(--fg-primary); }
-  .pill { padding: 6px 10px; border:1px solid var(--border); border-radius: 999px; background:var(--badge-bg); color: var(--fg-secondary); }
+  .solControls input[type="number"] { width: 36px; padding: 8px; height: 36px; }
+  .solControls .pill { padding: 8px 12px; border:1px solid var(--border); border-radius: var(--radius); background:var(--bg-panel); color: var(--fg-secondary); font-size: 12px; font-weight: 500; white-space: nowrap; display: flex; align-items: center; height: 36px; }
   
-  .sizeControls { display:flex; align-items:center; gap:6px; }
-  .sizeControls input[type="number"] { width: 64px; padding:6px 8px; border:1px solid var(--border-input); border-radius:8px; background: var(--bg-input); color: var(--fg-primary); }
-  .xsep { opacity:.6; }
+  .sizeControls { display:flex; align-items:center; gap:6px; background: var(--bg-panel); padding: 0; border-radius: var(--radius); border: 1px solid var(--border); height: 36px; }
+  .sizeControls input[type="number"] { width: 32px; padding: 8px; border: none; background: transparent; height: 100%; }
+  .xsep { opacity:.5; font-size: 12px; font-weight: 600; padding: 0 2px;}
   
-  .check { display:flex; align-items:center; gap:6px; user-select:none; color: var(--fg-primary); }
-  .check input { transform: translateY(1px); }
+  .check { display:inline-flex; align-items:center; gap:6px; user-select:none; color: var(--fg-primary); cursor: pointer;}
+  .check input { transform: translateY(1px); cursor: pointer; accent-color: var(--primary); width: 14px; height: 14px; }
   
-  .badge { padding:2px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; background:var(--badge-bg); color:var(--fg-badge); }
-  .sideHint { padding:10px 12px; border-bottom:1px solid var(--border); color:var(--fg-secondary); font-size:12px; background:var(--bg-body); }
-  .sideHint kbd { font: 500 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:var(--kbd-bg); border:1px solid var(--border); padding:2px 6px; border-radius:6px; color: var(--fg-primary); }
-  .btn-ghost {
-    padding: 6px 10px; border: 1px solid var(--border-input); border-radius: 8px; background: var(--bg-panel); cursor: pointer; font-size: 12px; color: var(--fg-primary);
-  }
-  .btn-ghost:hover { border-color: var(--border-hover); background: var(--bg-hover); }
+  .badge { padding:2px 8px; border:1px solid var(--border); border-radius:999px; font-size:11px; font-weight: 600; background:var(--badge-bg); color:var(--fg-badge); }
+  .sideHint { padding:12px 16px; border-bottom:1px solid var(--border); color:var(--fg-secondary); font-size:13px; line-height: 1.5; background:var(--bg-body); }
+  .sideHint kbd { font: 500 11px ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--kbd-bg); border:1px solid var(--border); padding:2px 6px; border-radius:4px; color: var(--fg-primary); }
   
-  .btn-code { background: rgba(46, 139, 87, 0.1); border-color: #2e8b57; color: #2e8b57; }
-  .btn-code:hover { background: rgba(46, 139, 87, 0.2); }
-  [data-theme="dark"] .btn-code { color: #4ade80; border-color: #4ade80; }
+  .btn-ghost { border-color: var(--border); box-shadow: none; background: var(--bg-panel); }
+  .btn-code { color: #4ade80; border-color: #4ade80; }
+  .btn-code:hover:not(:disabled) { background: rgba(74, 222, 128, 0.1); border-color: #22c55e; }
+  .btn-remove { color: var(--danger); border-color: var(--danger); }
+  .btn-remove:hover:not(:disabled) { background: rgba(239, 68, 68, 0.1); border-color: var(--danger-hover); }
 
-  .adjRow { display:flex; align-items:center; gap:6px; width: 100%; flex-wrap: wrap; }
-  .adjRow .check { margin-right: 8px; }
-  .adjRow input[type="number"] { width: 64px; padding:6px 8px; border:1px solid var(--border-input); border-radius:8px; background: var(--bg-input); color: var(--fg-primary); }
-  .indexBadge { font-weight:600; }
+  .adjRow { display:flex; align-items:center; gap:8px; width: 100%; flex-wrap: wrap; padding: 8px 0; }
+  .adjWrap { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .adjRow input[type="number"] { width: 54px; padding:4px 6px; }
 
+  /* Modal */
   #codeModal {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999;
-    display: none; align-items: center; justify-content: center;
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999;
+    display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px);
   }
   #codeContent {
-    background: var(--bg-panel); padding: 20px; border-radius: 12px; width: 650px; max-width: 95%;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 10px;
-    border: 1px solid var(--border);
+    background: var(--bg-panel); padding: 24px; border-radius: 12px; width: 650px; max-width: 95%;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
+    display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border);
     color: var(--fg-primary);
   }
   #codeArea {
-    width: 100%; height: 350px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px;
-    padding: 12px; border: 1px solid var(--border-input); border-radius: 6px; resize: vertical; 
-    background: var(--bg-code); color: #d4d4d4; white-space: pre;
+    width: 100%; height: 350px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+    padding: 16px; border: 1px solid var(--border-input); border-radius: var(--radius); resize: vertical; 
+    background: var(--bg-code); color: #d4d4d4; white-space: pre; outline: none; line-height: 1.4;
   }
+  #codeArea:focus { border-color: var(--primary); }
   .modalHeader { display: flex; justify-content: space-between; align-items: center; }
-  .modalActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;}
+  .modalActions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;}
 
+  .divider { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+  /* Responsive */
   @media (max-width: 1080px) {
-    body { height: auto; display: block; }
+    body { height: auto; display: block; overflow-x: hidden; }
     main { grid-template-columns: 1fr; }
-    aside { border-left: none; border-top: 1px solid var(--border); min-height: 500px; }
-    header { position: sticky; top: 0; z-index: 100; padding: 8px; }
+    aside { border-left: none; border-top: 1px solid var(--border); min-height: 600px; box-shadow: none; }
+    header { position: sticky; top: 0; z-index: 100; padding: 12px; gap: 8px; justify-content: space-between; }
+    button { padding: 10px 14px; }
+    input[type="number"] { padding: 8px; }
     .grow { display: none; }
-    .solControls { width: 100%; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 5px; }
-    .shapeMid { grid-template-columns: 1fr; }
-    .midControls { flex-direction: row; justify-content: flex-start; gap: 10px; }
-    .shapeMeta canvas { width: 100% !important; height: auto !important; }
-    #codeContent { width: 95%; height: 85vh; padding: 15px; }
+    .divider { display: none; }
+    .solControls { width: 100%; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+    #boardWrap { padding: 12px; }
+    #codeContent { width: 95%; height: 85vh; padding: 20px; }
+    #codeArea { height: 100%; flex: 1; }
   }
+  
+  .icon-btn { padding: 8px; border-radius: var(--radius); }
+  .icon-btn .material-symbols-outlined { font-size: 20px; margin: 0; }
 </style>
 </head>
 <body>
   <header>
-    <button id="btnAdd">➕ Add shape</button>
-    <button id="btnSolve">🔎 Find placement</button>
-    <button id="btnClear">🧹 Clear</button>
+    <button id="btnAdd"><span class="material-symbols-outlined">add</span> Add shape</button>
+    <button id="btnSolve" class="btn-primary"><span class="material-symbols-outlined">search</span> Find placement</button>
+    <button id="btnCancel"><span class="material-symbols-outlined">cancel</span> Cancel solve</button>
+    <button id="btnClear" class="btn-ghost"><span class="material-symbols-outlined">delete</span> Clear</button>
+
+    <div class="divider"></div>
 
     <label class="check" title="Include rotated variants of shapes during search">
-      <span class="hint">No Rotation</span>
       <input type="checkbox" id="disableRotation">
+      <span class="hint">No Rotation</span>
     </label>
 	
-  <label class="check" title="Force JS Worker instead of WASM">
-    <span class="hint">Legacy Solver</span>
-    <input type="checkbox" id="chkLegacy">
-  </label>
+    <label class="check" title="Force JS Worker instead of WASM">
+      <input type="checkbox" id="chkLegacy">
+      <span class="hint">Legacy Solver</span>
+    </label>
+
+    <div class="divider"></div>
 
     <div class="sizeControls">
-      <span class="hint">Board</span>
-      <input id="inpW" type="number" min="1" max="50" value="7">
+      <input id="inpW" type="number" min="1" max="50" value="7" aria-label="Width">
       <span class="xsep">×</span>
-      <input id="inpH" type="number" min="1" max="50" value="6">
+      <input id="inpH" type="number" min="1" max="50" value="6" aria-label="Height">
     </div>
 
-    <button id="btnTheme" title="Toggle Dark Mode">🌙</button>
+    <button id="btnTheme" class="btn-ghost icon-btn" title="Toggle Theme" aria-label="Toggle Theme">
+      <span class="material-symbols-outlined">light_mode</span>
+    </button>
 
     <div class="grow"></div>
+    
     <div class="solControls">
-      <label class="hint">Max solutions</label>
-      <input id="maxSol" type="number" min="1" max="200" value="5">
-      <button id="btnPrev" disabled="">◀</button>
-      <span id="solInfo" class="pill hint">0 / 0</span>
-      <button id="btnNext" disabled="">▶</button>
+      <label class="hint" style="display:flex; align-items:center; gap:6px;">
+        Max 
+        <input id="maxSol" type="number" min="1" max="200" value="5">
+      </label>
+      <button id="btnPrev" class="btn-ghost icon-btn" disabled="" aria-label="Previous Solution">
+        <span class="material-symbols-outlined">chevron_left</span>
+      </button>
+      <span id="solInfo" class="pill">0 / 0</span>
+      <button id="btnNext" class="btn-ghost icon-btn" disabled="" aria-label="Next Solution">
+        <span class="material-symbols-outlined">chevron_right</span>
+      </button>
     </div>
   </header>
 
@@ -234,9 +294,11 @@
     </div>
     <aside>
       <div class="sideHeader">
-        <strong>Shapes</strong>
+        <span class="material-symbols-outlined" style="font-size: 20px; color: var(--fg-secondary);">category</span>
+        Shapes
         <span id="shapeCount" class="badge">0</span>
-        <button id="btnRemoveAll" class="btn-ghost" style="display:none;">Remove all</button>
+        <div class="grow"></div>
+        <button id="btnRemoveAll" class="btn-ghost" style="display:none; padding: 4px 8px; font-size: 12px;">Remove all</button>
       </div>
       <div id="emptyState" class="sideHint">Draw a shape on the board by clicking cells, then press <b>Add shape</b> (or hit <kbd>Enter</kbd>) to save it here.</div>
       <div id="shapeList"></div>
@@ -246,15 +308,15 @@
   <div id="codeModal">
     <div id="codeContent">
       <div class="modalHeader">
-        <h3 style="margin:0">C# Property Code</h3>
+        <h3 style="margin:0; font-size: 16px; font-weight: 600;">C# Property Code</h3>
         <label class="check">
             <span class="hint">Generate Connections</span>
             <input type="checkbox" id="chkAutoConnect" checked> 
         </label>
       </div>
-      <textarea id="codeArea" readonly></textarea>
+      <textarea id="codeArea" readonly spellcheck="false"></textarea>
       <div class="modalActions">
-        <button id="btnCopyCode" class="btn-ghost">Copy Code</button>
+        <button id="btnCopyCode" class="btn-primary"><span class="material-symbols-outlined">content_copy</span> Copy Code</button>
         <button id="btnCloseModal" class="btn-ghost">Close</button>
       </div>
     </div>
@@ -262,211 +324,196 @@
 
 <script>
 /**
- * HIGH-PERFORMANCE WORKER SOURCE
- * Inlined as fallback for grids > 127 cells or when WASM is unavailable.
+ * COMBINED WASM / JS SOLVER WORKER SOURCE
  */
 const workerScript = `
-onmessage = function(e) {
-    const { shapeData, requestedMax, n, totalCells, W, H, initialOccupied, neighborLookup } = e.data;
-    let solutions = [];
+onmessage = async function(e) {
+    if (e.data.type === 'solve') {
+        const { useLegacy, wasmBytes, shapes, maxSols, disableRotation, W, H, totalCells, shapeData, neighborLookup, requestedMax, n } = e.data;
+        let solutions = [];
+        
+        if (wasmBytes && !useLegacy) {
+            try {
+                const result = await WebAssembly.instantiate(wasmBytes);
+                const wasmInstance = result.instance.exports;
+                
+                if (!wasmInstance.check_supported || wasmInstance.check_supported(W, H) === 1) {
+                    const ptr = wasmInstance.get_buffer_ptr();
+                    const mem = wasmInstance.memory.buffer;
+                    const buf = new Uint8Array(mem, ptr, 65536);
+                    let offset = 0;
+                    
+                    for (let i = 0; i < shapes.length; i++) {
+                        const shape = shapes[i];
+                        const cells = shape.cells;
+                        buf[offset++] = shape.prism ? 1 : 0;
+                        const adjTo = (Number.isInteger(shape.adjacentTo) && shape.adjacentTo >= 0 && shape.adjacentTo < shapes.length) ? shape.adjacentTo : -1;
+                        buf[offset++] = adjTo & 0xFF;
+                        buf[offset++] = shape.noEdge ? 1 : 0;
+                        buf[offset++] = cells.length;
+                        for (const [col, row] of cells) {
+                            buf[offset++] = col;
+                            buf[offset++] = row;
+                        }
+                    }
 
-    const shapeSizes = shapeData.map(s => {
-        let count = 0, m = s.placements[0].mask;
-        while(m > 0n) { m &= (m - 1n); count++; }
-        return count;
-    });
+                    wasmInstance.run_solver(W, H, shapes.length, maxSols, disableRotation ? 1 : 0);
 
-    function countBits(n) {
-        let count = 0;
-        while (n > 0n) { n &= (n - 1n); count++; }
-        return count;
-    }
-
-    function getIslandMask(occupied, startBit) {
-        let island = (1n << BigInt(startBit));
-        let lastIsland = 0n;
-        const fullMask = (1n << BigInt(totalCells)) - 1n;
-        const empty = fullMask & ~occupied;
-        while (island !== lastIsland) {
-            lastIsland = island;
-            let spread = island;
-            let temp = island;
-            while(temp > 0n) {
-                const lsb = temp & -temp;
-                const idx = (lsb.toString(2).length - 1);
-                spread |= neighborLookup[idx];
-                temp ^= lsb;
-            }
-            island = spread & empty;
-        }
-        return island;
-    }
-
-    const solve = (remaining, occupied, prismAdj, currentPlacements, domains) => {
-        if (solutions.length >= requestedMax) return;
-        if (remaining.length === 0) {
-            const sol = new Array(n);
-            for(let r of currentPlacements) sol[r.id] = r.mask;
-            solutions.push(sol);
-            return;
-        }
-
-        // Area Pruning
-        let requiredArea = 0;
-        for(let id of remaining) requiredArea += shapeSizes[id];
-        if (totalCells - countBits(occupied) < requiredArea) return;
-
-        // Island Pruning (Flood Fill check for small holes)
-        if (remaining.length > 0) {
-            const fullMask = (1n << BigInt(totalCells)) - 1n;
-            let unvisited = fullMask & ~occupied;
-            const minShapeSize = Math.min(...remaining.map(id => shapeSizes[id]));
-            while (unvisited > 0n) {
-                const startBit = (unvisited & -unvisited).toString(2).length - 1;
-                const island = getIslandMask(occupied, startBit);
-                if (countBits(island) < minShapeSize) return;
-                unvisited ^= island;
-            }
-        }
-
-        // MRV
-        let bestIdx = -1;
-        let minSize = Infinity;
-        for (let i = 0; i < remaining.length; i++) {
-            const sIdx = remaining[i];
-            const size = domains[sIdx].length;
-            if (size === 0) return;
-            if (size < minSize) { minSize = size; bestIdx = i; if (size === 1) break; }
-        }
-
-        const shapeId = remaining[bestIdx];
-        const nextRemaining = remaining.slice();
-        nextRemaining.splice(bestIdx, 1);
-        const candidates = domains[shapeId];
-        const targetId = shapeData[shapeId].adjTo;
-
-        for (let i = 0; i < candidates.length; i++) {
-            const p = candidates[i];
-            if ((p.mask & occupied) !== 0n) continue;
-            
-            // Adjacency Requirement
-            if (targetId !== -1) {
-                const placedTarget = currentPlacements.find(cp => cp.id === targetId);
-                if (placedTarget && (p.mask & placedTarget.adj) === 0n) continue;
-            }
-            
-            // Prism Requirement
-            if (shapeData[shapeId].prism && prismAdj !== 0n && (p.mask & prismAdj) === 0n) continue;
-
-            // Forward Checking
-            const newOccupied = occupied | p.mask;
-            const newPrismAdj = shapeData[shapeId].prism ? (prismAdj | p.adj) : prismAdj;
-            const newDomains = [];
-            let possible = true;
-
-            for (let j = 0; j < n; j++) {
-                if (j === shapeId || !remaining.includes(j)) { newDomains[j] = null; continue; }
-                const d = domains[j];
-                const filtered = [];
-                const mustTouchId = shapeData[j].adjTo;
-                for (let k = 0; k < d.length; k++) {
-                    const cand = d[k];
-                    if ((cand.mask & newOccupied) !== 0n) continue;
-                    if (mustTouchId === shapeId && (cand.mask & p.adj) === 0n) continue;
-                    filtered.push(cand);
+                    const dv = new DataView(wasmInstance.memory.buffer, ptr);
+                    let outOff = 0;
+                    const nSols = dv.getUint8(outOff++);
+                    for (let s = 0; s < nSols; s++) {
+                        const masks = [];
+                        for (let m = 0; m < shapes.length; m++) {
+                            const w0 = dv.getBigUint64(outOff, true); outOff += 8;
+                            const w1 = dv.getBigUint64(outOff, true); outOff += 8;
+                            const w2 = dv.getBigUint64(outOff, true); outOff += 8;
+                            const w3 = dv.getBigUint64(outOff, true); outOff += 8;
+                            masks.push((w3 << 192n) | (w2 << 128n) | (w1 << 64n) | w0);
+                        }
+                        solutions.push(masks);
+                    }
+                    postMessage({ type: 'solutions', solutions });
+                    return;
                 }
-                if (filtered.length === 0) { possible = false; break; }
-                newDomains[j] = filtered;
-            }
-
-            if (possible) {
-                currentPlacements.push({ id: shapeId, mask: p.mask, adj: p.adj });
-                solve(nextRemaining, newOccupied, newPrismAdj, currentPlacements, newDomains);
-                currentPlacements.pop();
-                if (solutions.length >= requestedMax) return;
+            } catch(err) {
+                console.warn('WASM solver error, falling back to JS worker:', err);
             }
         }
-    };
 
-    const initialDomains = shapeData.map(s => s.placements.filter(p => (p.mask & initialOccupied) === 0n));
-    solve(Array.from({length: n}, (_, i) => i), initialOccupied, 0n, [], initialDomains);
-    postMessage({ solutions });
+        const shapeSizes = shapeData.map(s => {
+            if (!s.placements.length) return 0;
+            let count = 0, m = s.placements[0].mask;
+            while(m > 0n) { m &= (m - 1n); count++; }
+            return count;
+        });
+
+        function countBits(n) {
+            let count = 0;
+            while (n > 0n) { n &= (n - 1n); count++; }
+            return count;
+        }
+
+        function getIslandMask(occupied, startBit) {
+            let island = (1n << BigInt(startBit));
+            let lastIsland = 0n;
+            const fullMask = (1n << BigInt(totalCells)) - 1n;
+            const empty = fullMask & ~occupied;
+            while (island !== lastIsland) {
+                lastIsland = island;
+                let spread = island;
+                let temp = island;
+                while(temp > 0n) {
+                    const lsb = temp & -temp;
+                    const idx = (lsb.toString(2).length - 1);
+                    spread |= neighborLookup[idx];
+                    temp ^= lsb;
+                }
+                island = spread & empty;
+            }
+            return island;
+        }
+
+        const solve = (remaining, occupied, prismAdj, currentPlacements, domains) => {
+            if (solutions.length >= requestedMax) return;
+            if (remaining.length === 0) {
+                const sol = new Array(n);
+                for(let r of currentPlacements) sol[r.id] = r.mask;
+                solutions.push(sol);
+                return;
+            }
+
+            let requiredArea = 0;
+            for(let id of remaining) requiredArea += shapeSizes[id];
+            if (totalCells - countBits(occupied) < requiredArea) return;
+
+            if (remaining.length > 0) {
+                const fullMask = (1n << BigInt(totalCells)) - 1n;
+                let unvisited = fullMask & ~occupied;
+                const minShapeSize = Math.min(...remaining.map(id => shapeSizes[id]));
+                while (unvisited > 0n) {
+                    const startBit = (unvisited & -unvisited).toString(2).length - 1;
+                    const island = getIslandMask(occupied, startBit);
+                    if (countBits(island) < minShapeSize) return;
+                    unvisited ^= island;
+                }
+            }
+
+            let bestIdx = -1;
+            let minSize = Infinity;
+            for (let i = 0; i < remaining.length; i++) {
+                const sIdx = remaining[i];
+                const size = domains[sIdx].length;
+                if (size === 0) return;
+                if (size < minSize) { minSize = size; bestIdx = i; if (size === 1) break; }
+            }
+
+            const shapeId = remaining[bestIdx];
+            const nextRemaining = remaining.slice();
+            nextRemaining.splice(bestIdx, 1);
+            const candidates = domains[shapeId];
+            const targetId = shapeData[shapeId].adjTo;
+
+            for (let i = 0; i < candidates.length; i++) {
+                const p = candidates[i];
+                if ((p.mask & occupied) !== 0n) continue;
+                
+                if (targetId !== -1) {
+                    const placedTarget = currentPlacements.find(cp => cp.id === targetId);
+                    if (placedTarget && (p.mask & placedTarget.adj) === 0n) continue;
+                }
+                
+                if (shapeData[shapeId].prism && prismAdj !== 0n && (p.mask & prismAdj) === 0n) continue;
+
+                const newOccupied = occupied | p.mask;
+                const newPrismAdj = shapeData[shapeId].prism ? (prismAdj | p.adj) : prismAdj;
+                const newDomains = [];
+                let possible = true;
+
+                for (let j = 0; j < n; j++) {
+                    if (j === shapeId || !remaining.includes(j)) { newDomains[j] = null; continue; }
+                    const d = domains[j];
+                    const filtered = [];
+                    const mustTouchId = shapeData[j].adjTo;
+                    for (let k = 0; k < d.length; k++) {
+                        const cand = d[k];
+                        if ((cand.mask & newOccupied) !== 0n) continue;
+                        if (mustTouchId === shapeId && (cand.mask & p.adj) === 0n) continue;
+                        filtered.push(cand);
+                    }
+                    if (filtered.length === 0) { possible = false; break; }
+                    newDomains[j] = filtered;
+                }
+
+                if (possible) {
+                    currentPlacements.push({ id: shapeId, mask: p.mask, adj: p.adj });
+                    solve(nextRemaining, newOccupied, newPrismAdj, currentPlacements, newDomains);
+                    currentPlacements.pop();
+                    if (solutions.length >= requestedMax) return;
+                }
+            }
+        };
+
+        const initialDomains = shapeData.map(s => s.placements.filter(p => (p.mask & 0n) === 0n));
+        solve(Array.from({length: n}, (_, i) => i), 0n, 0n, [], initialDomains);
+        postMessage({ type: 'solutions', solutions });
+    }
 };
 `;
 
-// ── WASM loader ────────────────────────────────────────────────────────────
-// engine.wasm must be in the same directory as this HTML file.
-let wasmInstance = null;
-
-async function loadWasm() {
+let wasmBytes = null;
+async function fetchWasm() {
     try {
         const response = await fetch('engine.wasm');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const bytes = await response.arrayBuffer();
-        const result = await WebAssembly.instantiate(bytes);
-        wasmInstance = result.instance.exports;
-        console.log('WASM solver loaded ✓');
+        wasmBytes = await response.arrayBuffer();
+        console.log('WASM solver bytes loaded ✓');
     } catch (e) {
-        console.log('WASM solver unavailable, using JS worker fallback:', e.message);
+        console.log('WASM solver unavailable, will fallback to JS worker:', e.message);
     }
 }
-loadWasm();
+fetchWasm();
 
-/**
- * Call the Rust/WASM solver synchronously.
- *
- * Writes shape cell data into the shared buffer, invokes run_solver(),
- * then reads back solutions as BigInt bitmasks (one per shape per solution).
- *
- * Returns an array of solutions, each being an array of BigInt masks
- * indexed by original shape index — same format as the JS worker output.
- */
-function callWasm(W, H, shapes, maxSols, disableRotation) {
-    const ptr = wasmInstance.get_buffer_ptr();
-    const mem = wasmInstance.memory.buffer;
-
-    // Write shape data before the call
-    const buf = new Uint8Array(mem, ptr, 65536);
-    let offset = 0;
-    for (let i = 0; i < shapes.length; i++) {
-        const shape = shapes[i];
-        const cells = shape.cells;
-        buf[offset++] = shape.prism ? 1 : 0;
-        const adjTo = (Number.isInteger(shape.adjacentTo) &&
-                       shape.adjacentTo >= 0 &&
-                       shape.adjacentTo < shapes.length)
-            ? shape.adjacentTo : -1;
-        buf[offset++] = adjTo & 0xFF;   // -1 becomes 0xFF which Rust reads as i8(-1)
-        buf[offset++] = shape.noEdge ? 1 : 0;
-        buf[offset++] = cells.length;
-        for (const [col, row] of cells) {
-            buf[offset++] = col;
-            buf[offset++] = row;
-        }
-    }
-
-    wasmInstance.run_solver(W, H, shapes.length, maxSols, disableRotation ? 1 : 0);
-
-    // Read solutions — get a fresh DataView after the call
-    const dv = new DataView(wasmInstance.memory.buffer, ptr);
-    let outOff = 0;
-    const nSols = dv.getUint8(outOff++);
-    const solutions = [];
-    for (let s = 0; s < nSols; s++) {
-        const masks = [];
-        for (let m = 0; m < shapes.length; m++) {
-            const w0 = dv.getBigUint64(outOff, true); outOff += 8;
-            const w1 = dv.getBigUint64(outOff, true); outOff += 8;
-            const w2 = dv.getBigUint64(outOff, true); outOff += 8;
-            const w3 = dv.getBigUint64(outOff, true); outOff += 8;
-            masks.push((w3 << 192n) | (w2 << 128n) | (w1 << 64n) | w0);
-        }
-        solutions.push(masks);
-    }
-    return solutions;
-}
-
-// ── Colour palette ─────────────────────────────────────────────────────────
 const COLORS = [
   "#e6194b","#3cb44b","#0082c8","#f58231","#911eb4","#46f0f0",
   "#f032e6","#d2f53c","#fabebe","#008080","#e6beff","#aa6e28",
@@ -866,8 +913,13 @@ class App {
     this.board = new HexBoard(7, 6, this.canvas);
     this.needsDraw = false;
 
+    this.solveWorker = null;
+    this.solveTimer = null;
+    this.solveStartTime = 0;
+
     document.getElementById('btnAdd').addEventListener('click', () => this.add_shape());
     document.getElementById('btnSolve').addEventListener('click', () => this.find_placement());
+    document.getElementById('btnCancel').addEventListener('click', () => this.cancel_solve());
     document.getElementById('btnClear').addEventListener('click', () => this.clear_board());
     document.getElementById('btnPrev').addEventListener('click', () => this.showPrevSolution());
     document.getElementById('btnNext').addEventListener('click', () => this.showNextSolution());
@@ -933,15 +985,15 @@ class App {
     window.addEventListener('mouseup', () => { isDragging = false; });
     window.addEventListener('touchend', () => { isDragging = false; });
 
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
-    const t = e.target;
-    if (t.tagName === 'INPUT') return;
-    
-    e.preventDefault(); 
-    this.add_shape();
-  }
-});
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+        const t = e.target;
+        if (t.tagName === 'INPUT') return;
+        
+        e.preventDefault(); 
+        this.add_shape();
+      }
+    });
 
     this.shapes = [];
     this.color_index = 0;
@@ -970,13 +1022,17 @@ window.addEventListener('keydown', (e) => {
   setTheme(themeName) {
     document.documentElement.setAttribute('data-theme', themeName);
     localStorage.setItem('theme', themeName);
-    document.getElementById('btnTheme').textContent = themeName === 'dark' ? '☀️' : '🌙';
+    const themeIcon = document.querySelector('#btnTheme .material-symbols-outlined');
+    if (themeIcon) {
+        themeIcon.textContent = themeName === 'dark' ? 'light_mode' : 'dark_mode';
+    }
     if (this.board) this.board.needsGridUpdate = true;
     this.requestRedraw();
     this.update_shape_list();
   }
 
   applySize() {
+    this.cancel_solve();
     const W = Math.max(1, Math.min(50, Number(this.inpW.value) || 1));
     const H = Math.max(1, Math.min(50, Number(this.inpH.value) || 1));
     this.inpW.value = String(W);
@@ -988,6 +1044,7 @@ window.addEventListener('keydown', (e) => {
   }
 
   add_shape() {
+    this.cancel_solve();
     if (this.board.filled.size === 0) return;
     const color = COLORS[this.color_index % COLORS.length]; this.color_index++;
     const cells = Array.from(this.board.filled.keys(), fromKey);
@@ -1000,6 +1057,7 @@ window.addEventListener('keydown', (e) => {
   }
 
   remove_shape(index) {
+    this.cancel_solve();
     if (index >= 0 && index < this.shapes.length) {
       this.shapes.splice(index, 1);
       this.update_shape_list();
@@ -1007,6 +1065,7 @@ window.addEventListener('keydown', (e) => {
   }
 
   remove_all_shapes() {
+    this.cancel_solve();
     if (this.shapes.length === 0) return;
     this.shapes = [];
     this.board.clear_all();
@@ -1015,6 +1074,7 @@ window.addEventListener('keydown', (e) => {
   }
 
   clear_board() {
+    this.cancel_solve();
     this.board.clear_all();
     this.board.hideMessage();
     this.solutionMasks = []; this.solutionIndex = 0; this.decodeHelpers = null; this.updateSolutionControls();
@@ -1043,7 +1103,7 @@ window.addEventListener('keydown', (e) => {
     list.innerHTML = '';
 
     if (countEl) countEl.textContent = String(this.shapes.length);
-    if (removeAllBtn) removeAllBtn.style.display = this.shapes.length > 0 ? 'inline-block' : 'none';
+    if (removeAllBtn) removeAllBtn.style.display = this.shapes.length > 0 ? 'inline-flex' : 'none';
 
     if (this.shapes.length === 0) {
       if (empty) empty.style.display = 'block';
@@ -1060,6 +1120,25 @@ window.addEventListener('keydown', (e) => {
       idxBadge.className = 'badge indexBadge';
       idxBadge.textContent = `#${i}`;
       topRow.appendChild(idxBadge);
+      
+      const controls = document.createElement('div');
+      controls.className = 'midControls';
+      const btnCode = document.createElement('button');
+      btnCode.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">code</span> Code';
+      btnCode.className = 'btn-ghost btn-code';
+      btnCode.style.padding = '4px 8px';
+      btnCode.style.fontSize = '12px';
+      btnCode.addEventListener('click', () => this.openCodeModal(shape));
+      controls.appendChild(btnCode);
+      const btn = document.createElement('button');
+      btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">close</span>';
+      btn.className = 'btn-ghost btn-remove icon-btn';
+      btn.style.padding = '4px 6px';
+      btn.title = 'Remove';
+      btn.addEventListener('click', () => this.remove_shape(i));
+      controls.appendChild(btn);
+      topRow.appendChild(controls);
+
       const midRow = document.createElement('div');
       midRow.className = 'shapeMid';
       const meta = document.createElement('div');
@@ -1067,19 +1146,8 @@ window.addEventListener('keydown', (e) => {
       const canvas = document.createElement('canvas');
       shape.drawToCanvas(canvas);
       meta.appendChild(canvas);
-      const controls = document.createElement('div');
-      controls.className = 'midControls';
-      const btnCode = document.createElement('button');
-      btnCode.textContent = 'Get C# Code';
-      btnCode.className = 'btn-ghost btn-code';
-      btnCode.addEventListener('click', () => this.openCodeModal(shape));
-      controls.appendChild(btnCode);
-      const btn = document.createElement('button');
-      btn.textContent = 'Remove';
-      btn.className = 'btn-ghost';
-      btn.addEventListener('click', () => this.remove_shape(i));
-      controls.appendChild(btn);
-      midRow.appendChild(meta); midRow.appendChild(controls);
+      midRow.appendChild(meta);
+      
       const bottomRow = document.createElement('div');
       bottomRow.className = 'shapeBottom';
       const adjRow = document.createElement('div');
@@ -1092,7 +1160,7 @@ window.addEventListener('keydown', (e) => {
       prismChk.addEventListener('change', () => { shape.prism = prismChk.checked; });
       const prismTxt = document.createElement('span');
       prismTxt.textContent = 'Prism'; prismTxt.className = 'hint';
-      prismWrap.appendChild(prismTxt); prismWrap.appendChild(prismChk);
+      prismWrap.appendChild(prismChk); prismWrap.appendChild(prismTxt);
       adjRow.appendChild(prismWrap);
 
       const edgeWrap = document.createElement('label');
@@ -1102,19 +1170,22 @@ window.addEventListener('keydown', (e) => {
       edgeChk.addEventListener('change', () => { shape.noEdge = edgeChk.checked; });
       const edgeTxt = document.createElement('span');
       edgeTxt.textContent = 'Boundary'; edgeTxt.className = 'hint';
-      edgeWrap.appendChild(edgeTxt); edgeWrap.appendChild(edgeChk);
+      edgeWrap.appendChild(edgeChk); edgeWrap.appendChild(edgeTxt);
       adjRow.appendChild(edgeWrap);
 
+      const adjWrap = document.createElement('div');
+      adjWrap.className = 'adjWrap';
       const adjLbl = document.createElement('span');
-      adjLbl.className = 'hint'; adjLbl.textContent = ' Adj to ';
+      adjLbl.className = 'hint'; adjLbl.textContent = 'Adj to';
       const adjInp = document.createElement('input');
-      adjInp.type = 'number'; adjInp.min = '0'; adjInp.placeholder = 'idx';
+      adjInp.type = 'number'; adjInp.min = '0'; adjInp.placeholder = '#';
       adjInp.value = (Number.isInteger(shape.adjacentTo) ? String(shape.adjacentTo) : '');
       adjInp.addEventListener('input', () => {
         const v = adjInp.value.trim();
         shape.adjacentTo = v === '' ? null : Number(v);
       });
-      adjRow.appendChild(adjLbl); adjRow.appendChild(adjInp);
+      adjWrap.appendChild(adjLbl); adjWrap.appendChild(adjInp);
+      adjRow.appendChild(adjWrap);
       bottomRow.appendChild(adjRow);
       item.appendChild(topRow); item.appendChild(midRow); item.appendChild(bottomRow);
       list.appendChild(item);
@@ -1128,7 +1199,10 @@ window.addEventListener('keydown', (e) => {
     const total = this.solutionMasks.length;
     prev.disabled = !(total > 1 && this.solutionIndex > 0);
     next.disabled = !(total > 1 && this.solutionIndex < total - 1);
-    info.textContent = `${total ? this.solutionIndex + 1 : 0} / ${total}`;
+    
+    if (!this.solveWorker) {
+        info.textContent = `${total ? this.solutionIndex + 1 : 0} / ${total}`;
+    }
   }
   showPrevSolution() { if (this.solutionIndex > 0) { this.solutionIndex--; this.applySolutionByIndex(this.solutionIndex); } }
   showNextSolution() { if (this.solutionIndex + 1 < this.solutionMasks.length) { this.solutionIndex++; this.applySolutionByIndex(this.solutionIndex); } }
@@ -1155,7 +1229,7 @@ window.addEventListener('keydown', (e) => {
     this.updateSolutionControls();
   }
 
-buildNeighborMasks(W, H) {
+  buildNeighborMasks(W, H) {
     const masks = [];
     for (let i = 0; i < W * H; i++) {
       const x = i % W;
@@ -1174,30 +1248,67 @@ buildNeighborMasks(W, H) {
     return masks;
   }
 
-  // ── Shared solution handler used by both WASM and Worker paths ──────────
-  _handleSolutions(solutions, duration, n, W, totalCells) {
-    if (solutions.length === 0) {
-      this.board.drawMessage(`No placement available (${duration}ms)`);
-      this.requestRedraw();
-    } else {
-      const indexToCoord = [];
-      for (let i = 0; i < totalCells; i++) indexToCoord.push([i % W, Math.floor(i / W)]);
-      const powIndex = new Map();
-      for (let i = 0; i < totalCells; i++) powIndex.set((1n << BigInt(i)).toString(), i);
-
-      this.solutionMasks = solutions;
-      this.decodeHelpers = {
-        powIndex,
-        indexToCoord,
-        order: Array.from({ length: n }, (_, i) => i),
-      };
-      this.applySolutionByIndex(0);
-      document.getElementById('solInfo').textContent = `1 / ${solutions.length} (${duration}ms)`;
-    }
+  cancel_solve() {
+      if (this.solveWorker) {
+          this.solveWorker.terminate();
+          this.solveWorker = null;
+      }
+      if (this.solveTimer) {
+          clearInterval(this.solveTimer);
+          this.solveTimer = null;
+      }
+      document.getElementById('btnSolve').style.display = 'inline-flex';
+      document.getElementById('btnCancel').style.display = 'none';
+      
+      if (this.solveStartTime > 0) {
+          const duration = ((performance.now() - this.solveStartTime) / 1000).toFixed(2);
+          document.getElementById('solInfo').textContent = `Cancelled (${duration}s)`;
+          this.solveStartTime = 0;
+      }
   }
 
-find_placement() {
-    const startTime = performance.now();
+  finish_solve(solutions, n, W, totalCells) {
+      if (this.solveWorker) {
+          this.solveWorker.terminate();
+          this.solveWorker = null;
+      }
+      if (this.solveTimer) {
+          clearInterval(this.solveTimer);
+          this.solveTimer = null;
+      }
+      document.getElementById('btnSolve').style.display = 'inline-flex';
+      document.getElementById('btnCancel').style.display = 'none';
+
+      const durationMs = performance.now() - this.solveStartTime;
+      const durationStr = durationMs >= 1000 ? (durationMs/1000).toFixed(2) + 's' : Math.round(durationMs) + 'ms';
+      this.solveStartTime = 0;
+
+      if (solutions.length === 0) {
+        this.board.drawMessage(`No placement available (${durationStr})`);
+        this.requestRedraw();
+        document.getElementById('solInfo').textContent = `0 / 0 (${durationStr})`;
+      } else {
+        const indexToCoord = [];
+        for (let i = 0; i < totalCells; i++) indexToCoord.push([i % W, Math.floor(i / W)]);
+        const powIndex = new Map();
+        for (let i = 0; i < totalCells; i++) powIndex.set((1n << BigInt(i)).toString(), i);
+
+        this.solutionMasks = solutions;
+        this.decodeHelpers = {
+          powIndex,
+          indexToCoord,
+          order: Array.from({ length: n }, (_, i) => i),
+        };
+        this.applySolutionByIndex(0);
+        document.getElementById('solInfo').textContent = `1 / ${solutions.length} (${durationStr})`;
+      }
+  }
+
+  find_placement() {
+    this.cancel_solve();
+
+    if (this.shapes.length === 0) { this.requestRedraw(); return; }
+
     this.board.hideMessage();
     this.board.filled.clear();
     this.solutionMasks = [];
@@ -1205,7 +1316,16 @@ find_placement() {
     this.decodeHelpers = null;
     this.updateSolutionControls();
 
-    if (this.shapes.length === 0) { this.requestRedraw(); return; }
+    document.getElementById('btnSolve').style.display = 'none';
+    document.getElementById('btnCancel').style.display = 'inline-flex';
+    
+    this.solveStartTime = performance.now();
+    document.getElementById('solInfo').textContent = `Solving... 0.0s`;
+    
+    this.solveTimer = setInterval(() => {
+        const diff = (performance.now() - this.solveStartTime) / 1000;
+        document.getElementById('solInfo').textContent = `Solving... ${diff.toFixed(1)}s`;
+    }, 100);
 
     const W = this.board.width, H = this.board.height;
     const totalCells = W * H;
@@ -1214,20 +1334,6 @@ find_placement() {
     const disableRotation = document.getElementById('disableRotation')?.checked ?? false;
     const useLegacy = document.getElementById('chkLegacy')?.checked ?? false;
 
-    // Only use WASM if it's loaded, supports this grid size, and Legacy is not checked.
-    if (wasmInstance && !useLegacy && wasmInstance.check_supported(W, H) === 1) {
-      try {
-        const solutions = callWasm(W, H, this.shapes, requestedMax, disableRotation);
-        const duration = (performance.now() - startTime).toFixed(2);
-        this._handleSolutions(solutions, duration, n, W, totalCells);
-        return;
-      } catch (err) {
-        console.warn('WASM solver error, falling back to JS worker:', err);
-      }
-    }
-    
-
-    // ── JS Web Worker path: fallback for large grids or WASM failure ──────
     const neighborLookup = this.buildNeighborMasks(W, H);
     
     const getAdjMask = (m) => {
@@ -1283,25 +1389,34 @@ find_placement() {
     });
 
     const blob = new Blob([workerScript], { type: 'application/javascript' });
-    const worker = new Worker(URL.createObjectURL(blob));
+    this.solveWorker = new Worker(URL.createObjectURL(blob));
     
-    worker.postMessage({ 
+    this.solveWorker.postMessage({
+        type: 'solve',
+        useLegacy,
+        wasmBytes,
+        shapes: this.shapes.map(s => ({
+            cells: s.cells,
+            prism: s.prism,
+            adjacentTo: s.adjacentTo,
+            noEdge: s.noEdge
+        })),
+        maxSols: requestedMax,
+        disableRotation,
+        W, H, totalCells,
         shapeData, 
-        requestedMax, 
-        n: shapeData.length, 
-        totalCells, 
-        W, H, 
-        initialOccupied: 0n,
-        neighborLookup: neighborLookup
+        neighborLookup,
+        requestedMax,
+        n
     });
 
-    worker.onmessage = (e) => {
-        const duration = (performance.now() - startTime).toFixed(2);
-        this._handleSolutions(e.data.solutions, duration, n, W, totalCells);
-        worker.terminate();
+    this.solveWorker.onmessage = (e) => {
+        if (e.data.type === 'solutions') {
+            this.finish_solve(e.data.solutions, n, W, totalCells);
+        }
     };
   }
- }
+}
 const app = new App();
 </script>
 </body></html>
